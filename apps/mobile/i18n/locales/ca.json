@@ -1,0 +1,117 @@
+{
+  "app_name": "Taula",
+  "tabs": {
+    "home": "Inici",
+    "reservations": "Reserves",
+    "profile": "Perfil"
+  },
+  "home": {
+    "greeting": "On vols sopar?",
+    "search_placeholder": "Busca restaurants...",
+    "nearby": "A prop teu",
+    "top_rated": "Millor valorats",
+    "open_now": "Oberts ara",
+    "all_restaurants": "Tots els restaurants",
+    "featured": "Destacats",
+    "no_results": "No s'han trobat restaurants"
+  },
+  "search": {
+    "recent": "Cerques recents",
+    "clear": "Esborrar",
+    "no_results": "Sense resultats",
+    "start_typing": "Cerca restaurants per nom o tipus de cuina",
+    "all_parishes": "Totes"
+  },
+  "restaurant": {
+    "reserve": "Reservar taula",
+    "info": "Info",
+    "reviews": "Ressenyes",
+    "hours": "Horaris",
+    "phone": "Telèfon",
+    "website": "Web",
+    "price_range": "Rang de preus",
+    "cuisine": "Cuina",
+    "open_map": "Obrir al mapa",
+    "no_reviews": "Encara no hi ha ressenyes",
+    "closed": "Tancat",
+    "location": "Ubicació",
+    "day_mon": "Dll",
+    "day_tue": "Dm",
+    "day_wed": "Dc",
+    "day_thu": "Dj",
+    "day_fri": "Dv",
+    "day_sat": "Ds",
+    "day_sun": "Dg"
+  },
+  "reservation": {
+    "title": "Nova reserva",
+    "select_date": "Selecciona data",
+    "select_time": "Selecciona hora",
+    "guests": "Comensals",
+    "special_requests": "Peticions especials",
+    "confirm": "Confirmar reserva",
+    "confirmed": "Reserva confirmada!",
+    "code": "Codi de reserva",
+    "cancel": "Cancel·lar reserva",
+    "cancel_confirm": "Segur que vols cancel·lar?",
+    "share": "Compartir",
+    "no_slots": "No hi ha disponibilitat per aquesta data",
+    "step": "Pas {{current}} de {{total}}",
+    "next": "Següent",
+    "summary": "Resum",
+    "date": "Data",
+    "time": "Hora",
+    "party_size": "Comensals",
+    "success_message": "La teva reserva ha estat confirmada",
+    "cancel_description": "Estàs segur? Aquesta acció no es pot desfer.",
+    "cancel_yes": "Sí, cancel·lar",
+    "cancelled": "Reserva cancel·lada",
+    "covers_available": "{{count}} disponible"
+  },
+  "reservations": {
+    "title": "Les meves reserves",
+    "upcoming": "Pròximes",
+    "past": "Passades",
+    "no_reservations": "Encara no tens reserves",
+    "login_prompt": "Inicia sessió per veure les teves reserves"
+  },
+  "auth": {
+    "login": "Iniciar sessió",
+    "register": "Registrar-se",
+    "email": "Correu electrònic",
+    "password": "Contrasenya",
+    "name": "Nom",
+    "or": "o",
+    "google": "Continuar amb Google",
+    "apple": "Continuar amb Apple",
+    "no_account": "No tens compte?",
+    "has_account": "Ja tens compte?",
+    "logout": "Tancar sessió"
+  },
+  "profile": {
+    "title": "El meu perfil",
+    "edit": "Editar perfil",
+    "language": "Idioma",
+    "notifications": "Notificacions",
+    "about": "Sobre Taula",
+    "delete_account": "Eliminar compte"
+  },
+  "common": {
+    "loading": "Carregant...",
+    "error": "Ha ocorregut un error",
+    "retry": "Tornar-ho a intentar",
+    "cancel": "Cancel·lar",
+    "save": "Guardar",
+    "done": "Fet",
+    "see_all": "Veure tot",
+    "persons": "{{count}} persona",
+    "persons_plural": "{{count}} persones"
+  },
+  "status": {
+    "CONFIRMED": "Confirmada",
+    "ARRIVED": "Assistida",
+    "NO_SHOW": "No presentat",
+    "CANCELLED_USER": "Cancel·lada",
+    "CANCELLED_RESTAURANT": "Cancel·lada pel restaurant"
+  }
+}

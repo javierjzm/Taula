@@ -1,0 +1,205 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// ─── USUARIOS ────────────────────────────────────────────────────
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  avatar        String?
+  phone         String?
+  passwordHash  String?
+  preferredLang String   @default("ca")
+  authProvider  String   @default("email")
+  googleId      String?  @unique
+  appleId       String?  @unique
+  pushToken     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  reservations Reservation[]
+  reviews      Review[]
+
+  @@index([email])
+  @@map("users")
+}
+
+// ─── RESTAURANTES ────────────────────────────────────────────────
+model Restaurant {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  description   String?
+  cuisineType   String[]
+  priceRange    Int
+  phone         String?
+  email         String?
+  website       String?
+  address       String
+  parish        Parish
+  latitude      Float
+  longitude     Float
+  isActive      Boolean   @default(false)
+  isFeatured    Boolean   @default(false)
+  featuredUntil DateTime?
+  coverImage    String?
+  images        String[]
+  menuPdfUrl    String?
+  avgRating     Float     @default(0)
+  reviewCount   Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  owner        RestaurantOwner?
+  hours        OpeningHours[]
+  reservations Reservation[]
+  reviews      Review[]
+  slots        AvailabilitySlot[]
+  billing      BillingRecord[]
+
+  @@index([parish])
+  @@index([isFeatured])
+  @@index([isActive])
+  @@map("restaurants")
+}
+
+enum Parish {
+  ANDORRA_LA_VELLA
+  ESCALDES_ENGORDANY
+  ENCAMP
+  CANILLO
+  LA_MASSANA
+  ORDINO
+  SANT_JULIA_DE_LORIA
+}
+
+model RestaurantOwner {
+  id           String     @id @default(cuid())
+  restaurantId String     @unique
+  email        String     @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime   @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@map("restaurant_owners")
+}
+
+model OpeningHours {
+  id           String     @id @default(cuid())
+  restaurantId String
+  dayOfWeek    Int
+  openTime     String
+  closeTime    String
+  isClosed     Boolean    @default(false)
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, dayOfWeek])
+  @@map("opening_hours")
+}
+
+// ─── DISPONIBILIDAD ──────────────────────────────────────────────
+model AvailabilitySlot {
+  id           String     @id @default(cuid())
+  restaurantId String
+  date         DateTime   @db.Date
+  time         String
+  maxCovers    Int
+  bookedCovers Int        @default(0)
+  isBlocked    Boolean    @default(false)
+
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id])
+  reservations Reservation[]
+
+  @@unique([restaurantId, date, time])
+  @@index([restaurantId, date])
+  @@map("availability_slots")
+}
+
+// ─── RESERVAS ────────────────────────────────────────────────────
+model Reservation {
+  id              String            @id @default(cuid())
+  code            String            @unique
+  userId          String
+  restaurantId    String
+  slotId          String
+  date            DateTime          @db.Date
+  time            String
+  partySize       Int
+  specialRequests String?
+  status          ReservationStatus @default(CONFIRMED)
+  reminderSent24h Boolean           @default(false)
+  reminderSent2h  Boolean           @default(false)
+  reviewRequested Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user       User             @relation(fields: [userId], references: [id])
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id])
+  slot       AvailabilitySlot @relation(fields: [slotId], references: [id])
+  billing    BillingRecord?
+
+  @@index([userId])
+  @@index([restaurantId])
+  @@index([date])
+  @@map("reservations")
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  ARRIVED
+  NO_SHOW
+  CANCELLED_USER
+  CANCELLED_RESTAURANT
+}
+
+// ─── RESEÑAS ─────────────────────────────────────────────────────
+model Review {
+  id           String     @id @default(cuid())
+  userId       String
+  restaurantId String
+  rating       Float
+  comment      String?
+  ownerReply   String?
+  isVisible    Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([userId, restaurantId])
+  @@index([restaurantId])
+  @@map("reviews")
+}
+
+// ─── FACTURACIÓN ─────────────────────────────────────────────────
+model BillingRecord {
+  id            String        @id @default(cuid())
+  restaurantId  String
+  reservationId String        @unique
+  amount        Float
+  covers        Int
+  status        BillingStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+
+  restaurant  Restaurant  @relation(fields: [restaurantId], references: [id])
+  reservation Reservation @relation(fields: [reservationId], references: [id])
+
+  @@map("billing_records")
+}
+
+enum BillingStatus {
+  PENDING
+  INVOICED
+  PAID
+}

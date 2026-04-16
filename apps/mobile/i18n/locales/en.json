@@ -1,0 +1,117 @@
+{
+  "app_name": "Taula",
+  "tabs": {
+    "home": "Home",
+    "reservations": "Reservations",
+    "profile": "Profile"
+  },
+  "home": {
+    "greeting": "Where do you want to dine?",
+    "search_placeholder": "Search restaurants...",
+    "nearby": "Nearby",
+    "top_rated": "Top Rated",
+    "open_now": "Open Now",
+    "all_restaurants": "All Restaurants",
+    "featured": "Featured",
+    "no_results": "No restaurants found"
+  },
+  "search": {
+    "recent": "Recent searches",
+    "clear": "Clear",
+    "no_results": "No results found",
+    "start_typing": "Search restaurants by name or cuisine",
+    "all_parishes": "All"
+  },
+  "restaurant": {
+    "reserve": "Reserve a table",
+    "info": "Info",
+    "reviews": "Reviews",
+    "hours": "Hours",
+    "phone": "Phone",
+    "website": "Website",
+    "price_range": "Price range",
+    "cuisine": "Cuisine",
+    "open_map": "Open in maps",
+    "no_reviews": "No reviews yet",
+    "closed": "Closed",
+    "location": "Location",
+    "day_mon": "Mon",
+    "day_tue": "Tue",
+    "day_wed": "Wed",
+    "day_thu": "Thu",
+    "day_fri": "Fri",
+    "day_sat": "Sat",
+    "day_sun": "Sun"
+  },
+  "reservation": {
+    "title": "New reservation",
+    "select_date": "Select date",
+    "select_time": "Select time",
+    "guests": "Guests",
+    "special_requests": "Special requests",
+    "confirm": "Confirm reservation",
+    "confirmed": "Reservation confirmed!",
+    "code": "Reservation code",
+    "cancel": "Cancel reservation",
+    "cancel_confirm": "Are you sure you want to cancel?",
+    "share": "Share",
+    "no_slots": "No availability for this date",
+    "step": "Step {{current}} of {{total}}",
+    "next": "Next",
+    "summary": "Summary",
+    "date": "Date",
+    "time": "Time",
+    "party_size": "Party size",
+    "success_message": "Your reservation has been confirmed",
+    "cancel_description": "Are you sure? This action cannot be undone.",
+    "cancel_yes": "Yes, cancel",
+    "cancelled": "Reservation cancelled",
+    "covers_available": "{{count}} available"
+  },
+  "reservations": {
+    "title": "My reservations",
+    "upcoming": "Upcoming",
+    "past": "Past",
+    "no_reservations": "No reservations yet",
+    "login_prompt": "Log in to see your reservations"
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Sign up",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "or": "or",
+    "google": "Continue with Google",
+    "apple": "Continue with Apple",
+    "no_account": "Don't have an account?",
+    "has_account": "Already have an account?",
+    "logout": "Log out"
+  },
+  "profile": {
+    "title": "My profile",
+    "edit": "Edit profile",
+    "language": "Language",
+    "notifications": "Notifications",
+    "about": "About Taula",
+    "delete_account": "Delete account"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "done": "Done",
+    "see_all": "See all",
+    "persons": "{{count}} person",
+    "persons_plural": "{{count}} people"
+  },
+  "status": {
+    "CONFIRMED": "Confirmed",
+    "ARRIVED": "Arrived",
+    "NO_SHOW": "No show",
+    "CANCELLED_USER": "Cancelled",
+    "CANCELLED_RESTAURANT": "Cancelled by restaurant"
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "app_name": "Taula",
+  "tabs": {
+    "home": "Inicio",
+    "reservations": "Reservas",
+    "profile": "Perfil"
+  },
+  "home": {
+    "greeting": "¿Dónde quieres cenar?",
+    "search_placeholder": "Buscar restaurantes...",
+    "nearby": "Cerca de ti",
+    "top_rated": "Mejor valorados",
+    "open_now": "Abiertos ahora",
+    "all_restaurants": "Todos los restaurantes",
+    "featured": "Destacados",
+    "no_results": "No se encontraron restaurantes"
+  },
+  "search": {
+    "recent": "Búsquedas recientes",
+    "clear": "Borrar",
+    "no_results": "Sin resultados",
+    "start_typing": "Busca restaurantes por nombre o tipo de cocina",
+    "all_parishes": "Todas"
+  },
+  "restaurant": {
+    "reserve": "Reservar mesa",
+    "info": "Info",
+    "reviews": "Reseñas",
+    "hours": "Horarios",
+    "phone": "Teléfono",
+    "website": "Web",
+    "price_range": "Rango de precios",
+    "cuisine": "Cocina",
+    "open_map": "Abrir en mapa",
+    "no_reviews": "Aún no hay reseñas",
+    "closed": "Cerrado",
+    "location": "Ubicación",
+    "day_mon": "Lun",
+    "day_tue": "Mar",
+    "day_wed": "Mié",
+    "day_thu": "Jue",
+    "day_fri": "Vie",
+    "day_sat": "Sáb",
+    "day_sun": "Dom"
+  },
+  "reservation": {
+    "title": "Nueva reserva",
+    "select_date": "Selecciona fecha",
+    "select_time": "Selecciona hora",
+    "guests": "Comensales",
+    "special_requests": "Peticiones especiales",
+    "confirm": "Confirmar reserva",
+    "confirmed": "¡Reserva confirmada!",
+    "code": "Código de reserva",
+    "cancel": "Cancelar reserva",
+    "cancel_confirm": "¿Seguro que quieres cancelar?",
+    "share": "Compartir",
+    "no_slots": "No hay disponibilidad para esta fecha",
+    "step": "Paso {{current}} de {{total}}",
+    "next": "Siguiente",
+    "summary": "Resumen",
+    "date": "Fecha",
+    "time": "Hora",
+    "party_size": "Comensales",
+    "success_message": "Tu reserva ha sido confirmada",
+    "cancel_description": "¿Estás seguro? Esta acción no se puede deshacer.",
+    "cancel_yes": "Sí, cancelar",
+    "cancelled": "Reserva cancelada",
+    "covers_available": "{{count}} disponible"
+  },
+  "reservations": {
+    "title": "Mis reservas",
+    "upcoming": "Próximas",
+    "past": "Pasadas",
+    "no_reservations": "Aún no tienes reservas",
+    "login_prompt": "Inicia sesión para ver tus reservas"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "register": "Registrarse",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "name": "Nombre",
+    "or": "o",
+    "google": "Continuar con Google",
+    "apple": "Continuar con Apple",
+    "no_account": "¿No tienes cuenta?",
+    "has_account": "¿Ya tienes cuenta?",
+    "logout": "Cerrar sesión"
+  },
+  "profile": {
+    "title": "Mi perfil",
+    "edit": "Editar perfil",
+    "language": "Idioma",
+    "notifications": "Notificaciones",
+    "about": "Sobre Taula",
+    "delete_account": "Eliminar cuenta"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ha ocurrido un error",
+    "retry": "Reintentar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "done": "Hecho",
+    "see_all": "Ver todo",
+    "persons": "{{count}} persona",
+    "persons_plural": "{{count}} personas"
+  },
+  "status": {
+    "CONFIRMED": "Confirmada",
+    "ARRIVED": "Asistida",
+    "NO_SHOW": "No presentado",
+    "CANCELLED_USER": "Cancelada",
+    "CANCELLED_RESTAURANT": "Cancelada por restaurante"
+  }
+}
