@@ -1,6 +1,7 @@
 {
   "name": "taula",
   "private": true,
+  "packageManager": "pnpm@10.29.2",
   "scripts": {
     "dev": "turbo dev",
     "dev:api": "turbo dev --filter=@taula/api",
