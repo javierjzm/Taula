@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, Linking, Platform, StyleSheet } from 'react-native';
-import MapboxGL from '@rnmapbox/maps';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { Colors } from '@/constants/colors';
 
 interface RestaurantMiniMapProps {
@@ -12,6 +12,10 @@ interface RestaurantMiniMapProps {
 
 function openInMaps(lat: number, lng: number, label: string) {
   const encodedLabel = encodeURIComponent(label);
+  if (Platform.OS === 'web') {
+    Linking.openURL(`https://maps.google.com/?q=${lat},${lng}`);
+    return;
+  }
   const url = Platform.select({
     ios: `maps:0,0?q=${encodedLabel}&ll=${lat},${lng}`,
     android: `geo:${lat},${lng}?q=${lat},${lng}(${encodedLabel})`,
@@ -24,6 +28,48 @@ export default function RestaurantMiniMap({
   longitude,
   name,
 }: RestaurantMiniMapProps) {
+  const isExpoGo = Constants.appOwnership === 'expo';
+  if (Platform.OS === 'web' || isExpoGo) {
+    return (
+      <View style={styles.container}>
+        <Pressable
+          style={styles.mapWrapper}
+          onPress={() => openInMaps(latitude, longitude, name)}
+        >
+          <View style={[styles.map, styles.webFallback]}>
+            <Ionicons name="map-outline" size={40} color={Colors.textTertiary} />
+            <Text style={styles.webCoords}>
+              {latitude.toFixed(4)}, {longitude.toFixed(4)}
+            </Text>
+            <Text style={styles.webHint}>Toca para abrir en Google Maps</Text>
+          </View>
+        </Pressable>
+      </View>
+    );
+  }
+
+  let MapboxGL: any;
+  try {
+    MapboxGL = require('@rnmapbox/maps').default;
+  } catch {
+    return (
+      <View style={styles.container}>
+        <Pressable
+          style={styles.mapWrapper}
+          onPress={() => openInMaps(latitude, longitude, name)}
+        >
+          <View style={[styles.map, styles.webFallback]}>
+            <Ionicons name="map-outline" size={40} color={Colors.textTertiary} />
+            <Text style={styles.webCoords}>
+              {latitude.toFixed(4)}, {longitude.toFixed(4)}
+            </Text>
+            <Text style={styles.webHint}>Toca para abrir en Google Maps</Text>
+          </View>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.mapWrapper}>
@@ -76,6 +122,20 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  webFallback: {
+    backgroundColor: Colors.surfaceSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  webCoords: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  webHint: {
+    fontSize: 12,
+    color: Colors.textTertiary,
   },
   pin: {
     width: 32,

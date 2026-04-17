@@ -12,7 +12,9 @@ export default function SearchBar() {
   return (
     <Pressable style={styles.container} onPress={() => router.push('/search')}>
       <View style={styles.inner}>
-        <Ionicons name="search" size={18} color={Colors.textTertiary} />
+        <View style={styles.iconWrap}>
+          <Ionicons name="search" size={18} color={Colors.primary} />
+        </View>
         <Text style={styles.placeholder}>Buscar restaurantes...</Text>
       </View>
       {activeCount > 0 && (
@@ -29,9 +31,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 12,
+    marginBottom: 14,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
@@ -41,7 +43,15 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: Colors.primaryGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   placeholder: {
     fontSize: 15,

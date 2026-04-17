@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
 import { api, setTokens, clearTokens } from '../services/api';
+import { storage } from '../services/storage';
 
 interface User {
   id: string;
@@ -75,7 +75,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   loadSession: async () => {
     try {
-      const token = await SecureStore.getItemAsync('accessToken');
+      const token = await storage.getItem('accessToken');
       if (!token) {
         set({ isLoading: false });
         return;

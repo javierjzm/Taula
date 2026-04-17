@@ -14,7 +14,7 @@ import {
 import { Link, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import Constants from 'expo-constants';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/authStore';
 export default function LoginScreen() {
   const { t } = useTranslation();
   const { login, loginWithGoogle, loginWithApple } = useAuthStore();
+  const isExpoGo = Constants.appOwnership === 'expo';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,7 +44,16 @@ export default function LoginScreen() {
   };
 
   const handleGoogle = async () => {
+    if (isExpoGo) {
+      Alert.alert(
+        t('common.error'),
+        'Google Sign-In no esta disponible en Expo Go. Usa email/password o un development build.',
+      );
+      return;
+    }
+
     try {
+      const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
       const idToken = userInfo.data?.idToken;
@@ -97,13 +107,15 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text style={styles.brand}>Taula</Text>
+            <Text style={styles.brand}>taula</Text>
             <Text style={styles.subtitle}>{t('home.greeting')}</Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color={Colors.textTertiary} style={styles.inputIcon} />
+              <View style={styles.inputIconWrap}>
+                <Ionicons name="mail-outline" size={18} color={Colors.primary} />
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder={t('auth.email')}
@@ -117,7 +129,9 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color={Colors.textTertiary} style={styles.inputIcon} />
+              <View style={styles.inputIconWrap}>
+                <Ionicons name="lock-closed-outline" size={18} color={Colors.primary} />
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder={t('auth.password')}
@@ -157,15 +171,20 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.socialBtns}>
-            <TouchableOpacity style={styles.socialBtn} onPress={handleGoogle} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={[styles.socialBtn, isExpoGo && styles.socialBtnDisabled]}
+              onPress={handleGoogle}
+              activeOpacity={0.7}
+              disabled={isLoading}
+            >
               <Ionicons name="logo-google" size={20} color={Colors.text} />
               <Text style={styles.socialBtnText}>{t('auth.google')}</Text>
             </TouchableOpacity>
 
             {Platform.OS === 'ios' && (
-              <TouchableOpacity style={[styles.socialBtn, styles.appleBtn]} onPress={handleApple} activeOpacity={0.7}>
-                <Ionicons name="logo-apple" size={20} color={Colors.white} />
-                <Text style={[styles.socialBtnText, styles.appleBtnText]}>{t('auth.apple')}</Text>
+              <TouchableOpacity style={styles.socialBtn} onPress={handleApple} activeOpacity={0.7}>
+                <Ionicons name="logo-apple" size={20} color={Colors.text} />
+                <Text style={styles.socialBtnText}>{t('auth.apple')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -199,13 +218,13 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 44,
   },
   brand: {
-    fontSize: 42,
-    fontWeight: '800',
+    fontSize: 48,
+    fontWeight: '900',
     color: Colors.primary,
-    letterSpacing: -1,
+    letterSpacing: -2,
   },
   subtitle: {
     fontSize: 16,
@@ -219,14 +238,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 14,
-    height: 52,
+    paddingHorizontal: 12,
+    height: 56,
+    gap: 10,
   },
-  inputIcon: {
-    marginRight: 10,
+  inputIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: Colors.primaryGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,
@@ -238,19 +263,22 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     backgroundColor: Colors.primary,
-    borderRadius: 14,
-    height: 52,
+    borderRadius: 16,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
+    ...Colors.shadow.md,
   },
   primaryBtnDisabled: {
-    opacity: 0.5,
+    backgroundColor: Colors.surfaceSecondary,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   primaryBtnText: {
     color: Colors.white,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
   },
   divider: {
     flexDirection: 'row',
@@ -274,30 +302,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 52,
-    borderRadius: 14,
+    height: 56,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
     gap: 10,
+  },
+  socialBtnDisabled: {
+    opacity: 0.4,
   },
   socialBtnText: {
     fontSize: 15,
     fontWeight: '600',
     color: Colors.text,
   },
-  appleBtn: {
-    backgroundColor: Colors.black,
-    borderColor: Colors.black,
-  },
-  appleBtnText: {
-    color: Colors.white,
-  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 36,
     gap: 6,
     paddingBottom: 24,
   },

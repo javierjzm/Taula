@@ -41,33 +41,33 @@ export default function CategoryBar({ selected, onSelect }: CategoryBarProps) {
 const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 14,
     gap: 8,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.surfaceSecondary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     gap: 6,
   },
   pillActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryGlow,
     borderColor: Colors.primary,
   },
   emoji: {
-    fontSize: 16,
+    fontSize: 18,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.textSecondary,
   },
   labelActive: {
-    color: Colors.white,
+    color: Colors.primary,
   },
 });

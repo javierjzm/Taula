@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/colors';
+import { CUISINE_TYPES } from '@/constants/andorra';
 
 export interface Restaurant {
   id: string;
@@ -30,13 +31,21 @@ export default function RestaurantCardH({ restaurant }: RestaurantCardHProps) {
       style={styles.card}
       onPress={() => router.push(`/restaurant/${restaurant.slug}`)}
     >
-      <Image
-        source={{ uri: restaurant.imageUrl ?? undefined }}
-        style={styles.image}
-        contentFit="cover"
-        placeholder={{ blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH' }}
-        transition={200}
-      />
+      <View style={styles.imageWrap}>
+        <Image
+          source={{ uri: restaurant.imageUrl ?? undefined }}
+          style={styles.image}
+          contentFit="cover"
+          placeholder={{ blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH' }}
+          transition={200}
+        />
+        {restaurant.rating > 0 && (
+          <View style={styles.ratingBadge}>
+            <Ionicons name="star" size={11} color={Colors.star} />
+            <Text style={styles.ratingBadgeText}>{restaurant.rating.toFixed(1)}</Text>
+          </View>
+        )}
+      </View>
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={1}>
           {restaurant.name}
@@ -44,23 +53,28 @@ export default function RestaurantCardH({ restaurant }: RestaurantCardHProps) {
 
         {restaurant.cuisineType.length > 0 && (
           <View style={styles.cuisineRow}>
-            {restaurant.cuisineType.slice(0, 2).map((c) => (
-              <View key={c} style={styles.cuisineBadge}>
-                <Text style={styles.cuisineText}>{c}</Text>
-              </View>
-            ))}
+            {restaurant.cuisineType.slice(0, 2).map((c) => {
+              const match = CUISINE_TYPES.find((ct) => ct.id === c);
+              return (
+                <View key={c} style={styles.cuisineBadge}>
+                  <Text style={styles.cuisineText}>{match ? match.label : c}</Text>
+                </View>
+              );
+            })}
           </View>
         )}
 
         <View style={styles.bottomRow}>
-          <View style={styles.ratingRow}>
-            <Ionicons name="star" size={13} color={Colors.star} />
-            <Text style={styles.rating}>{restaurant.rating.toFixed(1)}</Text>
-            <Text style={styles.reviewCount}>({restaurant.reviewCount})</Text>
-          </View>
           <Text style={styles.parish} numberOfLines={1}>
             {restaurant.parish}
           </Text>
+          {restaurant.distance != null && (
+            <Text style={styles.distance}>
+              {restaurant.distance < 1
+                ? `${Math.round(restaurant.distance * 1000)} m`
+                : `${restaurant.distance.toFixed(1)} km`}
+            </Text>
+          )}
         </View>
       </View>
     </Pressable>
@@ -71,20 +85,38 @@ const styles = StyleSheet.create({
   card: {
     width: 220,
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  imageWrap: {
+    position: 'relative',
   },
   image: {
     width: '100%',
-    height: 130,
+    height: 140,
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  ratingBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.white,
   },
   body: {
-    padding: 10,
+    padding: 12,
     gap: 6,
   },
   name: {
@@ -97,9 +129,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   cuisineBadge: {
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.surfaceElevated,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   cuisineText: {
@@ -112,23 +144,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  rating: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  reviewCount: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-  },
   parish: {
     fontSize: 11,
     color: Colors.textTertiary,
-    maxWidth: 80,
+    maxWidth: 100,
+  },
+  distance: {
+    fontSize: 11,
+    color: Colors.accent,
+    fontWeight: '600',
   },
 });

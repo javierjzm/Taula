@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { Colors } from '@/constants/colors';
 
 export default function TabLayout() {
@@ -33,8 +33,10 @@ export default function TabLayout() {
         name="index"
         options={{
           title: t('tabs.home'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? { shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8 } : undefined}>
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+            </View>
           ),
         }}
       />
@@ -42,8 +44,10 @@ export default function TabLayout() {
         name="reservations"
         options={{
           title: t('tabs.reservations'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? { shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8 } : undefined}>
+              <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={24} color={color} />
+            </View>
           ),
         }}
       />
@@ -51,8 +55,10 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: t('tabs.profile'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? { shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8 } : undefined}>
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+            </View>
           ),
         }}
       />

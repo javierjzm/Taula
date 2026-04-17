@@ -3,6 +3,30 @@ import { AppError } from '../utils/errors';
 import { generateReservationCode } from '../utils/reservationCode';
 import { emailQueue, pushQueue } from '../jobs/queue';
 
+function toDTO(r: any) {
+  return {
+    id: r.id,
+    code: r.code,
+    restaurantId: r.restaurantId,
+    restaurantName: r.restaurant?.name ?? '',
+    restaurantCover: r.restaurant?.coverImage ?? null,
+    restaurantAddress: r.restaurant?.address ?? '',
+    restaurantSlug: r.restaurant?.slug ?? '',
+    date: typeof r.date === 'string' ? r.date : r.date?.toISOString?.().split('T')[0] ?? '',
+    time: r.time,
+    partySize: r.partySize,
+    specialRequests: r.specialRequests ?? null,
+    status: r.status,
+    createdAt: r.createdAt?.toISOString?.() ?? r.createdAt,
+  };
+}
+
+const RESERVATION_INCLUDE = {
+  restaurant: {
+    select: { name: true, address: true, coverImage: true, slug: true },
+  },
+} as const;
+
 export class ReservationService {
   constructor(private prisma: PrismaClient) {}
 
@@ -15,17 +39,19 @@ export class ReservationService {
     specialRequests?: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const slot = await tx.$queryRaw<[{ id: string; max_covers: number; booked_covers: number; is_blocked: boolean }]>`
-        SELECT id, max_covers, booked_covers, is_blocked
-        FROM availability_slots
-        WHERE id = ${input.slotId} AND restaurant_id = ${input.restaurantId}
+      const slot = await tx.$queryRaw<
+        [{ id: string; maxCovers: number; bookedCovers: number; isBlocked: boolean }]
+      >`
+        SELECT id, "maxCovers", "bookedCovers", "isBlocked"
+        FROM "availability_slots"
+        WHERE id = ${input.slotId} AND "restaurantId" = ${input.restaurantId}
         FOR UPDATE
       `;
 
       if (!slot[0]) throw new AppError(404, 'Slot no encontrado');
-      if (slot[0].is_blocked) throw new AppError(409, 'Este horario no está disponible');
+      if (slot[0].isBlocked) throw new AppError(409, 'Este horario no está disponible');
 
-      const available = slot[0].max_covers - slot[0].booked_covers;
+      const available = slot[0].maxCovers - slot[0].bookedCovers;
       if (available < input.partySize) {
         throw new AppError(409, `Solo quedan ${available} plazas disponibles en este horario`);
       }
@@ -43,7 +69,7 @@ export class ReservationService {
           status: 'CONFIRMED',
         },
         include: {
-          restaurant: { select: { name: true, address: true, coverImage: true } },
+          restaurant: { select: { name: true, address: true, coverImage: true, slug: true } },
           user: { select: { name: true, email: true, pushToken: true } },
         },
       });
@@ -84,20 +110,21 @@ export class ReservationService {
         });
       }
 
-      return reservation;
+      return toDTO(reservation);
     });
   }
 
   async cancelByUser(userId: string, reservationId: string) {
     const reservation = await this.prisma.reservation.findFirst({
       where: { id: reservationId, userId },
+      include: RESERVATION_INCLUDE,
     });
     if (!reservation) throw new AppError(404, 'Reserva no encontrada');
     if (reservation.status !== 'CONFIRMED') {
       throw new AppError(409, 'Esta reserva ya no puede cancelarse');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       await tx.reservation.update({
         where: { id: reservationId },
         data: { status: 'CANCELLED_USER' },
@@ -113,28 +140,24 @@ export class ReservationService {
         data: { status: 'PENDING' },
       });
     });
+
+    return toDTO({ ...reservation, status: 'CANCELLED_USER' });
   }
 
   async getUserReservations(userId: string) {
-    return this.prisma.reservation.findMany({
+    const reservations = await this.prisma.reservation.findMany({
       where: { userId },
-      include: {
-        restaurant: {
-          select: { name: true, address: true, coverImage: true, slug: true },
-        },
-      },
+      include: RESERVATION_INCLUDE,
       orderBy: { date: 'desc' },
     });
+    return reservations.map(toDTO);
   }
 
-  async getById(reservationId: string) {
-    return this.prisma.reservation.findUnique({
-      where: { id: reservationId },
-      include: {
-        restaurant: {
-          select: { name: true, address: true, coverImage: true, slug: true },
-        },
-      },
+  async getById(userId: string, reservationId: string) {
+    const reservation = await this.prisma.reservation.findFirst({
+      where: { id: reservationId, userId },
+      include: RESERVATION_INCLUDE,
     });
+    return reservation ? toDTO(reservation) : null;
   }
 }

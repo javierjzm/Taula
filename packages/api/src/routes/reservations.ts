@@ -20,14 +20,14 @@ export const reservationRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
-    const reservation = await service.getById(id);
+    const reservation = await service.getById(request.userId, id);
     if (!reservation) return reply.code(404).send({ message: 'Reserva no encontrada' });
     return { data: reservation };
   });
 
   fastify.patch('/:id/cancel', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
-    await service.cancelByUser(request.userId, id);
-    return reply.send({ message: 'Reserva cancelada' });
+    const reservation = await service.cancelByUser(request.userId, id);
+    return { data: reservation };
   });
 };

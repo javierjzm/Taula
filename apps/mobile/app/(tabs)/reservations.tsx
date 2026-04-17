@@ -1,7 +1,6 @@
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -13,31 +12,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
-
-interface Reservation {
-  id: string;
-  restaurantName: string;
-  restaurantImage: string | null;
-  date: string;
-  time: string;
-  partySize: number;
-  status: 'CONFIRMED' | 'ARRIVED' | 'NO_SHOW' | 'CANCELLED_USER' | 'CANCELLED_RESTAURANT';
-}
+import type { Reservation, ApiResponse } from '@taula/shared';
 
 interface ReservationsResponse {
   data: Reservation[];
 }
 
-const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  CONFIRMED: { bg: '#E6F9F1', text: Colors.success },
-  ARRIVED: { bg: '#E6F9F1', text: Colors.success },
-  NO_SHOW: { bg: '#FEF3F2', text: Colors.error },
-  CANCELLED_USER: { bg: '#FEF3F2', text: Colors.error },
-  CANCELLED_RESTAURANT: { bg: '#FEF3F2', text: Colors.error },
+const STATUS_STYLES: Record<string, { bg: string; text: string; icon: string }> = {
+  CONFIRMED: { bg: Colors.successLight, text: Colors.success, icon: 'checkmark-circle' },
+  ARRIVED: { bg: Colors.accentLight, text: Colors.accent, icon: 'restaurant' },
+  NO_SHOW: { bg: Colors.warningLight, text: Colors.warning, icon: 'alert-circle' },
+  CANCELLED_USER: { bg: Colors.errorLight, text: Colors.error, icon: 'close-circle' },
+  CANCELLED_RESTAURANT: { bg: Colors.errorLight, text: Colors.error, icon: 'close-circle' },
 };
 
 function LoginPrompt() {
@@ -45,7 +35,9 @@ function LoginPrompt() {
 
   return (
     <View style={styles.center}>
-      <Ionicons name="calendar-outline" size={64} color={Colors.border} />
+      <View style={styles.emptyIconWrap}>
+        <Ionicons name="calendar-outline" size={48} color={Colors.textTertiary} />
+      </View>
       <Text style={styles.promptTitle}>{t('reservations.login_prompt')}</Text>
       <TouchableOpacity
         style={styles.loginBtn}
@@ -58,10 +50,15 @@ function LoginPrompt() {
   );
 }
 
+function safeParse(dateStr: string): Date {
+  if (dateStr.includes('T')) return new Date(dateStr);
+  return new Date(dateStr + 'T00:00:00');
+}
+
 function ReservationCard({ item }: { item: Reservation }) {
   const { t } = useTranslation();
   const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.CONFIRMED;
-  const dateFormatted = format(new Date(item.date), 'dd MMM yyyy');
+  const d = safeParse(item.date);
 
   return (
     <TouchableOpacity
@@ -71,8 +68,8 @@ function ReservationCard({ item }: { item: Reservation }) {
     >
       <View style={styles.cardLeft}>
         <View style={styles.dateBox}>
-          <Text style={styles.dateDay}>{format(new Date(item.date), 'dd')}</Text>
-          <Text style={styles.dateMonth}>{format(new Date(item.date), 'MMM')}</Text>
+          <Text style={styles.dateDay}>{format(d, 'dd')}</Text>
+          <Text style={styles.dateMonth}>{format(d, 'MMM')}</Text>
         </View>
       </View>
       <View style={styles.cardBody}>
@@ -84,6 +81,7 @@ function ReservationCard({ item }: { item: Reservation }) {
           <Text style={styles.cardMetaText}>{item.partySize}</Text>
         </View>
         <View style={[styles.badge, { backgroundColor: statusStyle.bg }]}>
+          <Ionicons name={statusStyle.icon as any} size={12} color={statusStyle.text} />
           <Text style={[styles.badgeText, { color: statusStyle.text }]}>
             {t(`status.${item.status}`)}
           </Text>
@@ -106,7 +104,7 @@ export default function ReservationsScreen() {
     isRefetching,
   } = useQuery<ReservationsResponse>({
     queryKey: ['reservations'],
-    queryFn: () => api('/reservations'),
+    queryFn: () => api<ReservationsResponse>('/reservations'),
     enabled: isAuthenticated,
   });
 
@@ -132,7 +130,9 @@ export default function ReservationsScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Ionicons name="cloud-offline-outline" size={48} color={Colors.textTertiary} />
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="cloud-offline-outline" size={40} color={Colors.textTertiary} />
+          </View>
           <Text style={styles.errorText}>{t('common.error')}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
             <Text style={styles.retryBtnText}>{t('common.retry')}</Text>
@@ -159,7 +159,9 @@ export default function ReservationsScreen() {
 
       {sections.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="calendar-outline" size={56} color={Colors.border} />
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="calendar-outline" size={48} color={Colors.textTertiary} />
+          </View>
           <Text style={styles.emptyText}>{t('reservations.no_reservations')}</Text>
         </View>
       ) : (
@@ -178,6 +180,7 @@ export default function ReservationsScreen() {
               onRefresh={refetch}
               tintColor={Colors.primary}
               colors={[Colors.primary]}
+              progressBackgroundColor={Colors.surface}
             />
           }
         />
@@ -195,7 +198,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
+    gap: 16,
     paddingHorizontal: 32,
   },
   header: {
@@ -212,22 +215,23 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: Colors.textTertiary,
     paddingHorizontal: 20,
     marginTop: 16,
     marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
-  // Card
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
     marginHorizontal: 20,
     marginBottom: 10,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -236,26 +240,27 @@ const styles = StyleSheet.create({
     marginRight: 14,
   },
   dateBox: {
-    width: 48,
-    height: 52,
-    borderRadius: 10,
-    backgroundColor: Colors.primaryLight + '20',
+    width: 50,
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryGlow,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dateDay: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
     color: Colors.primary,
   },
   dateMonth: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.primaryDark,
+    color: Colors.primaryLight,
     textTransform: 'uppercase',
   },
   cardBody: {
     flex: 1,
+    gap: 4,
   },
   cardName: {
     fontSize: 15,
@@ -265,7 +270,6 @@ const styles = StyleSheet.create({
   cardMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
     gap: 4,
   },
   cardMetaText: {
@@ -273,38 +277,45 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   badge: {
+    flexDirection: 'row',
     alignSelf: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginTop: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 4,
+    gap: 4,
   },
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
   },
 
-  // Login prompt
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   promptTitle: {
     fontSize: 16,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginTop: 4,
   },
   loginBtn: {
     paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
     backgroundColor: Colors.primary,
-    marginTop: 8,
+    marginTop: 4,
   },
   loginBtnText: {
     color: Colors.white,
     fontWeight: '700',
     fontSize: 15,
   },
-
-  // Empty / Error
   emptyText: {
     fontSize: 15,
     color: Colors.textTertiary,
@@ -316,10 +327,9 @@ const styles = StyleSheet.create({
   },
   retryBtn: {
     paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 12,
+    borderRadius: 14,
     backgroundColor: Colors.primary,
-    marginTop: 4,
   },
   retryBtnText: {
     color: Colors.white,

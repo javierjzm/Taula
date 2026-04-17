@@ -1,23 +1,44 @@
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './storage';
+import Constants from 'expo-constants';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/v1';
+const ensureV1 = (url: string): string => {
+  const clean = url.replace(/\/+$/, '');
+  return clean.endsWith('/v1') ? clean : `${clean}/v1`;
+};
+
+const resolveApiUrl = (): string => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return ensureV1(process.env.EXPO_PUBLIC_API_URL);
+  }
+
+  // In Expo Go/dev, infer host from Metro URL so physical devices can hit local API.
+  const hostUri = (Constants.expoConfig as any)?.hostUri as string | undefined;
+  const inferredHost = hostUri?.split(':')[0];
+  if (inferredHost) {
+    return `http://${inferredHost}:3000/v1`;
+  }
+
+  return 'http://localhost:3000/v1';
+};
+
+const API_URL = resolveApiUrl();
 
 const getToken = async (): Promise<string | null> => {
-  return SecureStore.getItemAsync('accessToken');
+  return storage.getItem('accessToken');
 };
 
 const setTokens = async (accessToken: string, refreshToken: string) => {
-  await SecureStore.setItemAsync('accessToken', accessToken);
-  await SecureStore.setItemAsync('refreshToken', refreshToken);
+  await storage.setItem('accessToken', accessToken);
+  await storage.setItem('refreshToken', refreshToken);
 };
 
 export const clearTokens = async () => {
-  await SecureStore.deleteItemAsync('accessToken');
-  await SecureStore.deleteItemAsync('refreshToken');
+  await storage.removeItem('accessToken');
+  await storage.removeItem('refreshToken');
 };
 
 const refreshAccessToken = async (): Promise<string | null> => {
-  const refreshToken = await SecureStore.getItemAsync('refreshToken');
+  const refreshToken = await storage.getItem('refreshToken');
   if (!refreshToken) return null;
 
   try {
@@ -53,7 +74,12 @@ export const api = async <T = any>(
     ...(token && { Authorization: `Bearer ${token}` }),
   };
 
-  let res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+  } catch {
+    throw new Error('No se pudo conectar con el servidor. Revisa API_URL y que la API esté levantada.');
+  }
 
   if (res.status === 401 && token) {
     const newToken = await refreshAccessToken();
@@ -62,7 +88,11 @@ export const api = async <T = any>(
         ...headers,
         Authorization: `Bearer ${newToken}`,
       };
-      res = await fetch(`${API_URL}${endpoint}`, { ...options, headers: retryHeaders });
+      try {
+        res = await fetch(`${API_URL}${endpoint}`, { ...options, headers: retryHeaders });
+      } catch {
+        throw new Error('No se pudo conectar con el servidor tras refrescar sesión.');
+      }
     }
   }
 

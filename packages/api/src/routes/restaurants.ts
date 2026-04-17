@@ -8,9 +8,10 @@ export const restaurantRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/', async (request) => {
     const query = z
       .object({
+        q: z.string().optional(),
         lat: z.coerce.number().optional(),
         lon: z.coerce.number().optional(),
-        radius: z.coerce.number().default(5000),
+        radius: z.coerce.number().default(50000),
         parish: z.string().optional(),
         cuisine: z.string().optional(),
         priceRange: z

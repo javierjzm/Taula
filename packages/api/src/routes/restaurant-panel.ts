@@ -121,10 +121,27 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     const { status } = z.object({ status: z.enum(['ARRIVED', 'NO_SHOW', 'CANCELLED_RESTAURANT']) }).parse(request.body);
 
-    const reservation = await fastify.prisma.reservation.update({
-      where: { id, restaurantId: request.restaurantId },
-      data: { status },
+    const reservation = await fastify.prisma.$transaction(async (tx) => {
+      const current = await tx.reservation.findFirst({
+        where: { id, restaurantId: request.restaurantId },
+      });
+      if (!current) throw new Error('Reserva no encontrada');
+
+      const updated = await tx.reservation.update({
+        where: { id },
+        data: { status },
+      });
+
+      if (status === 'CANCELLED_RESTAURANT' && current.status === 'CONFIRMED') {
+        await tx.availabilitySlot.update({
+          where: { id: current.slotId },
+          data: { bookedCovers: { decrement: current.partySize } },
+        });
+      }
+
+      return updated;
     });
+
     return { data: reservation };
   });
 

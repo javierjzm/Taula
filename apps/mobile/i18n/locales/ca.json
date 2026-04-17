@@ -13,7 +13,18 @@
     "open_now": "Oberts ara",
     "all_restaurants": "Tots els restaurants",
     "featured": "Destacats",
-    "no_results": "No s'han trobat restaurants"
+    "no_results": "No s'han trobat restaurants",
+    "status_open": "Obert",
+    "status_closed": "Tancat",
+    "reviews_count": "{{count}} ressenyes",
+    "distance_km": "{{value}} km"
+  },
+  "location": {
+    "default_city": "Andorra la Vella",
+    "select_title": "Trieu la ubicació",
+    "use_gps": "Fer servir la meva ubicació",
+    "gps_subtitle": "Segons el GPS, s'actualitza sola",
+    "choose_parish": "o trieu una parròquia"
   },
   "search": {
     "recent": "Cerques recents",
@@ -56,6 +67,13 @@
     "cancel_confirm": "Segur que vols cancel·lar?",
     "share": "Compartir",
     "no_slots": "No hi ha disponibilitat per aquesta data",
+    "try_another_date": "Prova amb una altra data o menys comensals",
+    "loading_slots": "Buscant horaris disponibles...",
+    "today": "Avui",
+    "tomorrow": "Demà",
+    "lunch": "Migdia",
+    "dinner": "Sopar",
+    "new_reservation": "Nova reserva",
     "step": "Pas {{current}} de {{total}}",
     "next": "Següent",
     "summary": "Resum",
@@ -66,7 +84,9 @@
     "cancel_description": "Estàs segur? Aquesta acció no es pot desfer.",
     "cancel_yes": "Sí, cancel·lar",
     "cancelled": "Reserva cancel·lada",
-    "covers_available": "{{count}} disponible"
+    "covers_available": "{{count}} disponible",
+    "requests_placeholder": "Al·lèrgies, cadira de nadó, aniversari...",
+    "status_label": "Estat"
   },
   "reservations": {
     "title": "Les meves reserves",

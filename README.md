@@ -53,6 +53,8 @@ cp .env.example .env
 
 Edita `.env` y rellena las variables necesarias. Para desarrollo local, los valores por defecto de database y Redis ya funcionan con Docker Compose. Los tokens de terceros (Mapbox, Firebase, Resend, etc.) son opcionales para arrancar la API.
 
+> **Ubicacion del `.env`:** debe estar en la **raiz del monorepo** (`taula/.env`). El paquete `packages/api` carga ese fichero con `env-cmd` al ejecutar `pnpm dev` (API), `pnpm db:migrate`, `pnpm db:seed` y `prisma studio`. No hace falta duplicar `.env` dentro de `packages/api`.
+
 ### 1.3 Levantar base de datos y Redis
 
 ```bash
@@ -85,10 +87,10 @@ pnpm db:seed
 ```
 
 Esto crea:
-- **3 restaurantes**: Borda Jovell (Ordino), Can Manel (Andorra la Vella), Sushi Andorra (Andorra la Vella)
+- **11 restaurantes** de ejemplo (varias parroquias y tipos de cocina), con imagenes, ratings y datos completos
 - Horarios de apertura y slots de disponibilidad (30 dias)
-- Owners para cada restaurante
-- **1 usuario de prueba**
+- Un **owner** por restaurante: email `owner@<slug>.taula.ad` (misma contrasena para todos, ver seccion 3)
+- **1 usuario de prueba** de app
 
 ---
 
@@ -115,15 +117,65 @@ pnpm dev:backoffice
 
 Abre **http://localhost:5173**. El proxy de Vite redirige `/v1/*` a la API en el puerto 3000, asi que la API debe estar corriendo.
 
-### 2.3 Solo la app movil
+### 2.3 Solo la app movil (Expo)
+
+Desde la **raiz del monorepo** (`taula/`):
 
 ```bash
 pnpm dev:mobile
 ```
 
-Esto ejecuta `expo start`. Escanea el QR con Expo Go (Android) o la camara (iOS).
+Equivale a `expo start` en `apps/mobile`. Se abre la consola de Metro; desde ahi puedes:
 
-> La app movil necesita la API corriendo. Si estas en un dispositivo fisico, cambia `API_URL` en `.env` por la IP de tu maquina (ej. `http://192.168.1.50:3000`).
+| Tecla / accion | Efecto |
+|---|---|
+| `a` | Abrir en emulador Android (si tienes Android Studio) |
+| `i` | Abrir en simulador iOS (solo macOS) |
+| `w` | Abrir en navegador (web) |
+| `r` | Recargar el bundle |
+| QR con **Expo Go** | Probar en telefono real (recomendado) |
+
+**Requisitos para probar en telefono con Expo Go**
+
+1. **API en marcha** en tu PC: `pnpm dev:api` (puerto **3000**).
+2. **Misma red WiFi** que el ordenador donde corre Metro, o usa tunnel (abajo).
+3. Cuenta **Expo** (`npx expo login`) si la CLI lo pide para el QR o para publicar.
+
+**URL de la API en el movil**
+
+- En el mismo WiFi, la app suele resolver sola la IP del PC a partir de Metro (`EXPO_PUBLIC_API_URL` no es obligatorio).
+- Si falla la conexion o usas otra red, define en `.env` en la raiz (y reinicia Expo):
+
+  ```env
+  EXPO_PUBLIC_API_URL="http://TU_IP_LOCAL:3000"
+  ```
+
+  Sustituye `TU_IP_LOCAL` por la IPv4 de tu PC (ej. `192.168.1.50`). El valor debe apuntar al **puerto 3000** de la API (sin `/v1`; la app lo anade).
+
+  Expo carga variables desde el directorio de la app: si no te las toma desde la raiz, crea `apps/mobile/.env` con la misma linea `EXPO_PUBLIC_API_URL=...`.
+
+**Tunnel (otra red / VPN)**
+
+```bash
+cd apps/mobile
+npx expo start --tunnel
+```
+
+**Puerto 3000 ocupado (API)**
+
+Si ves `EADDRINUSE` al arrancar la API, otra instancia ya usa el puerto. En Windows (PowerShell):
+
+```powershell
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+```
+
+**Limpiar cache de Metro** (si algo va raro):
+
+```bash
+cd apps/mobile
+npx expo start --clear
+```
 
 ### 2.4 Todo a la vez
 
@@ -144,11 +196,10 @@ Turborepo ejecuta en paralelo: API + Backoffice + Mobile.
 | Password | `password123` |
 
 ### Panel de restaurante (backoffice)
-| Restaurante | Email | Password |
-|---|---|---|
-| Borda Jovell | `owner@borda-jovell.taula.ad` | `password123` |
-| Can Manel | `owner@can-manel.taula.ad` | `password123` |
-| Sushi Andorra | `owner@sushi-andorra.taula.ad` | `password123` |
+
+Tras el seed, cada restaurante tiene un usuario owner: **`owner@<slug>.taula.ad`** / **`password123`**.
+
+Ejemplos: `owner@borda-jovell.taula.ad`, `owner@koi-sushi-andorra.taula.ad`, `owner@mar-blau.taula.ad` (el `<slug>` coincide con el del seed en `packages/api/prisma/seed.ts`).
 
 ### Admin API
 Los endpoints `/v1/admin/*` requieren la cabecera `x-admin-key` con el valor de `ADMIN_API_KEY` del `.env` (por defecto: `change-me-admin-key`).
@@ -227,7 +278,7 @@ docker compose down -v    # Para y borra datos (reset completo)
 | Capa | Tecnologias |
 |---|---|
 | **Backend** | Node.js, Fastify 5, TypeScript, Prisma 6, PostgreSQL 16 + PostGIS, Redis 7, BullMQ |
-| **Mobile** | React Native 0.76, Expo SDK 52, Expo Router 4, Mapbox, React Query, Zustand, i18next |
+| **Mobile** | React Native (Expo SDK 54), Expo Router 6, Mapbox (nativo; fallback en web), React Query, Zustand, i18next |
 | **Backoffice** | React 18, Vite 5, TailwindCSS 3, Recharts, Zustand, Axios |
 | **Shared** | TypeScript, Zod 3 |
 | **Auth** | JWT (access + refresh), Google OAuth, Apple Sign-In, bcrypt |
@@ -286,9 +337,9 @@ docker compose up -d
 3. Re-genera el client: `pnpm db:generate`
 
 ### La app movil no conecta con la API
-- En Expo Go, `localhost` apunta al dispositivo, no a tu PC
-- Cambia `API_URL` en `.env` por tu IP local (ej. `http://192.168.1.50:3000`)
-- O usa `EXPO_PUBLIC_API_URL` como variable de entorno
+- En Expo Go, `localhost` es el telefono, no tu PC
+- Pon `EXPO_PUBLIC_API_URL="http://<IP_de_tu_PC>:3000"` en `.env` en la raiz del monorepo y reinicia Metro (`Ctrl+C` y `pnpm dev:mobile`)
+- Comprueba firewall de Windows y que PC y movil esten en la misma WiFi, o usa `npx expo start --tunnel` desde `apps/mobile`
 
 ### Error "build scripts were ignored" con pnpm
 ```bash

@@ -10,43 +10,45 @@ export type Parish =
 export type PriceRange = 1 | 2 | 3 | 4;
 
 export type CuisineType =
-  | 'andorrana'
-  | 'espanyola'
-  | 'francesa'
-  | 'italiana'
-  | 'japonesa'
-  | 'americana'
-  | 'vegetariana'
-  | 'internacional'
-  | 'grill'
-  | 'mariscos'
-  | 'pizza'
-  | 'burguer';
+  | 'pizza_pasta'
+  | 'burgers'
+  | 'sushi'
+  | 'steakhouse'
+  | 'seafood'
+  | 'healthy'
+  | 'asian'
+  | 'mediterranean'
+  | 'mexican'
+  | 'tapas'
+  | 'brunch'
+  | 'fine_dining';
 
 export interface RestaurantListItem {
   id: string;
   name: string;
   slug: string;
-  cuisineType: CuisineType[];
-  priceRange: PriceRange;
+  cuisineType: string[];
+  cuisine: string;
+  priceRange: number;
   address: string;
-  parish: Parish;
+  parish: string;
   latitude: number;
   longitude: number;
-  distanceMeters?: number;
+  distanceMeters?: number | null;
+  distance?: number | null;
   avgRating: number;
   reviewCount: number;
   isFeatured: boolean;
   coverImage: string | null;
-  isOpenNow: boolean;
-  nextAvailableSlot: string | null;
+  images: string[];
+  isOpen: boolean;
 }
 
 export interface RestaurantDetail extends RestaurantListItem {
   description: string | null;
   phone: string | null;
+  email: string | null;
   website: string | null;
-  images: string[];
   menuPdfUrl: string | null;
   hours: OpeningHours[];
 }

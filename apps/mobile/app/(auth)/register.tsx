@@ -72,13 +72,15 @@ export default function RegisterScreen() {
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Text style={styles.brand}>Taula</Text>
+            <Text style={styles.brand}>taula</Text>
             <Text style={styles.title}>{t('auth.register')}</Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color={Colors.textTertiary} style={styles.inputIcon} />
+              <View style={styles.inputIconWrap}>
+                <Ionicons name="person-outline" size={18} color={Colors.primary} />
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder={t('auth.name')}
@@ -91,7 +93,9 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color={Colors.textTertiary} style={styles.inputIcon} />
+              <View style={styles.inputIconWrap}>
+                <Ionicons name="mail-outline" size={18} color={Colors.primary} />
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder={t('auth.email')}
@@ -105,7 +109,9 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color={Colors.textTertiary} style={styles.inputIcon} />
+              <View style={styles.inputIconWrap}>
+                <Ionicons name="lock-closed-outline" size={18} color={Colors.primary} />
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder={t('auth.password')}
@@ -192,9 +198,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -207,10 +213,10 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   brand: {
-    fontSize: 42,
-    fontWeight: '800',
+    fontSize: 48,
+    fontWeight: '900',
     color: Colors.primary,
-    letterSpacing: -1,
+    letterSpacing: -2,
   },
   title: {
     fontSize: 18,
@@ -225,14 +231,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 14,
-    height: 52,
+    paddingHorizontal: 12,
+    height: 56,
+    gap: 10,
   },
-  inputIcon: {
-    marginRight: 10,
+  inputIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: Colors.primaryGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,
@@ -259,44 +271,47 @@ const styles = StyleSheet.create({
   langChip: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
   },
   langChipActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryGlow,
     borderColor: Colors.primary,
   },
   langChipText: {
     fontSize: 14,
     fontWeight: '500',
-    color: Colors.text,
+    color: Colors.textSecondary,
   },
   langChipTextActive: {
-    color: Colors.white,
+    color: Colors.primary,
   },
   primaryBtn: {
     backgroundColor: Colors.primary,
-    borderRadius: 14,
-    height: 52,
+    borderRadius: 16,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
+    ...Colors.shadow.md,
   },
   primaryBtnDisabled: {
-    opacity: 0.5,
+    backgroundColor: Colors.surfaceSecondary,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   primaryBtnText: {
     color: Colors.white,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 36,
     gap: 6,
     paddingBottom: 24,
   },

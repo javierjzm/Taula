@@ -13,12 +13,13 @@ import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
+import { CUISINE_TYPES } from '@/constants/andorra';
 import { Image } from 'expo-image';
-import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { PARISHES } from '@/constants/andorra';
 import { api } from '@/services/api';
+import { storage } from '@/services/storage';
 import type { RestaurantListItem, PaginatedResponse } from '@taula/shared';
 
 const RECENT_KEY = 'taula_recent_searches';
@@ -41,7 +42,7 @@ function RestaurantCardV({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       {item.coverImage ? (
         <Image
           source={{ uri: item.coverImage }}
@@ -60,23 +61,26 @@ function RestaurantCardV({
         </Text>
         <View style={styles.cardMeta}>
           <View style={styles.ratingRow}>
-            <Ionicons name="star" size={14} color={Colors.star} />
+            <Ionicons name="star" size={13} color={Colors.star} />
             <Text style={styles.ratingText}>{item.avgRating.toFixed(1)}</Text>
             <Text style={styles.reviewCount}>({item.reviewCount})</Text>
           </View>
           <Text style={styles.priceText}>
             {'€'.repeat(item.priceRange)}
-            <Text style={{ color: Colors.border }}>{'€'.repeat(4 - item.priceRange)}</Text>
+            <Text style={{ color: Colors.textTertiary }}>{'€'.repeat(4 - item.priceRange)}</Text>
           </Text>
         </View>
         <View style={styles.cardChips}>
-          {item.cuisineType.slice(0, 2).map((c) => (
-            <View key={c} style={styles.cuisineChip}>
-              <Text style={styles.cuisineChipText}>{c}</Text>
-            </View>
-          ))}
+          {item.cuisineType.slice(0, 2).map((c) => {
+            const match = CUISINE_TYPES.find((ct) => ct.id === c);
+            return (
+              <View key={c} style={styles.cuisineChip}>
+                <Text style={styles.cuisineChipText}>{match ? match.label : c}</Text>
+              </View>
+            );
+          })}
           <Text style={styles.parishText}>
-            {item.parish.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase())}
+            {item.parish}
           </Text>
         </View>
       </View>
@@ -101,7 +105,7 @@ export default function SearchScreen() {
 
   const loadRecent = async () => {
     try {
-      const raw = await SecureStore.getItemAsync(RECENT_KEY);
+      const raw = await storage.getItem(RECENT_KEY);
       if (raw) setRecentSearches(JSON.parse(raw));
     } catch {
       /* noop */
@@ -111,12 +115,12 @@ export default function SearchScreen() {
   const saveRecent = async (term: string) => {
     const updated = [term, ...recentSearches.filter((s) => s !== term)].slice(0, MAX_RECENT);
     setRecentSearches(updated);
-    await SecureStore.setItemAsync(RECENT_KEY, JSON.stringify(updated));
+    await storage.setItem(RECENT_KEY, JSON.stringify(updated));
   };
 
   const clearRecent = async () => {
     setRecentSearches([]);
-    await SecureStore.deleteItemAsync(RECENT_KEY);
+    await storage.removeItem(RECENT_KEY);
   };
 
   const buildParams = () => {
@@ -151,7 +155,7 @@ export default function SearchScreen() {
 
       <View style={styles.header}>
         <View style={styles.searchRow}>
-          <Ionicons name="search" size={20} color={Colors.textTertiary} />
+          <Ionicons name="search" size={20} color={Colors.primary} />
           <TextInput
             ref={inputRef}
             style={styles.input}
@@ -209,7 +213,9 @@ export default function SearchScreen() {
 
       {showEmpty && (
         <View style={styles.center}>
-          <Ionicons name="search-outline" size={64} color={Colors.border} />
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="search-outline" size={48} color={Colors.textTertiary} />
+          </View>
           <Text style={styles.emptyText}>{t('search.start_typing')}</Text>
         </View>
       )}
@@ -238,7 +244,9 @@ export default function SearchScreen() {
 
       {showNoResults && (
         <View style={styles.center}>
-          <Ionicons name="restaurant-outline" size={64} color={Colors.border} />
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="restaurant-outline" size={48} color={Colors.textTertiary} />
+          </View>
           <Text style={styles.emptyText}>{t('search.no_results')}</Text>
         </View>
       )}
@@ -272,16 +280,18 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     backgroundColor: Colors.surface,
     gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   searchRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
-    gap: 8,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    gap: 10,
   },
   input: {
     flex: 1,
@@ -295,13 +305,13 @@ const styles = StyleSheet.create({
   cancelText: {
     color: Colors.primary,
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   chipsScroll: {
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    maxHeight: 52,
+    maxHeight: 56,
   },
   chipsContainer: {
     paddingHorizontal: 16,
@@ -311,14 +321,14 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingVertical: 7,
+    borderRadius: 12,
     backgroundColor: Colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   chipActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryGlow,
     borderColor: Colors.primary,
   },
   chipText: {
@@ -327,7 +337,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   chipTextActive: {
-    color: Colors.white,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   center: {
     flex: 1,
@@ -335,6 +346,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
     gap: 16,
+  },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
     fontSize: 15,
@@ -380,20 +399,17 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   cardImage: {
     width: '100%',
     height: 160,
+    backgroundColor: Colors.surfaceSecondary,
   },
   cardImagePlaceholder: {
-    backgroundColor: Colors.surfaceSecondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -403,7 +419,7 @@ const styles = StyleSheet.create({
   },
   cardName: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.text,
   },
   cardMeta: {
@@ -418,8 +434,8 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
+    fontWeight: '700',
+    color: Colors.star,
   },
   reviewCount: {
     fontSize: 13,
@@ -437,7 +453,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   cuisineChip: {
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.surfaceElevated,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,

@@ -1,11 +1,13 @@
 import React from 'react';
 import { View, Text, FlatList, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import RestaurantCardH, { type Restaurant } from './RestaurantCardH';
 
 interface RestaurantSectionProps {
   title: string;
+  icon?: string;
   restaurants: Restaurant[];
   loading?: boolean;
   seeAllHref?: string;
@@ -13,6 +15,7 @@ interface RestaurantSectionProps {
 
 export default function RestaurantSection({
   title,
+  icon,
   restaurants,
   loading = false,
   seeAllHref,
@@ -22,7 +25,10 @@ export default function RestaurantSection({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleRow}>
+          {icon && <Ionicons name={icon as any} size={18} color={Colors.primary} />}
+          <Text style={styles.title}>{title}</Text>
+        </View>
         {seeAllHref && (
           <Pressable onPress={() => router.push(seeAllHref as any)}>
             <Text style={styles.seeAll}>Ver todo</Text>
@@ -58,10 +64,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 14,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: Colors.text,
   },

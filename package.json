@@ -13,7 +13,7 @@
     "type-check": "turbo type-check",
     "db:generate": "turbo db:generate --filter=@taula/api",
     "db:migrate": "turbo db:migrate --filter=@taula/api",
-    "db:seed": "pnpm --filter=@taula/api exec tsx prisma/seed.ts"
+    "db:seed": "pnpm --filter=@taula/api run db:seed"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

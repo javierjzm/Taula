@@ -30,7 +30,7 @@ function LoginPrompt() {
   return (
     <View style={styles.center}>
       <View style={styles.loginAvatar}>
-        <Ionicons name="person-outline" size={48} color={Colors.border} />
+        <Ionicons name="person-outline" size={48} color={Colors.textTertiary} />
       </View>
       <Text style={styles.loginTitle}>{t('reservations.login_prompt')}</Text>
       <TouchableOpacity
@@ -142,7 +142,7 @@ export default function ProfileScreen() {
               activeOpacity={0.6}
             >
               <View style={styles.menuIcon}>
-                <Ionicons name={item.icon} size={22} color={Colors.text} />
+                <Ionicons name={item.icon} size={20} color={Colors.primary} />
               </View>
               <Text style={styles.menuLabel}>{t(item.labelKey)}</Text>
               <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
+    gap: 16,
     paddingHorizontal: 32,
   },
   scroll: {
@@ -187,10 +187,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  // Profile header
   profileHeader: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 24,
     marginHorizontal: 20,
     backgroundColor: Colors.surface,
     borderRadius: 20,
@@ -202,14 +201,18 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
+    borderWidth: 3,
+    borderColor: Colors.primary,
   },
   avatarPlaceholder: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.primaryLight + '30',
+    backgroundColor: Colors.primaryGlow,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: Colors.primary,
   },
   avatarInitial: {
     fontSize: 32,
@@ -220,7 +223,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: Colors.text,
-    marginTop: 12,
+    marginTop: 14,
   },
   userEmail: {
     fontSize: 14,
@@ -228,11 +231,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Menu
   menu: {
     marginHorizontal: 20,
     backgroundColor: Colors.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.border,
     overflow: 'hidden',
@@ -249,10 +251,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.surfaceSecondary,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: Colors.primaryGlow,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -264,17 +266,18 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
 
-  // Logout
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 20,
     marginTop: 28,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: Colors.error + '10',
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: Colors.errorLight,
     gap: 8,
+    borderWidth: 1,
+    borderColor: `${Colors.error}25`,
   },
   logoutText: {
     fontSize: 15,
@@ -282,7 +285,6 @@ const styles = StyleSheet.create({
     color: Colors.error,
   },
 
-  // Login prompt
   loginAvatar: {
     width: 96,
     height: 96,
@@ -301,8 +303,8 @@ const styles = StyleSheet.create({
   },
   loginBtn: {
     paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
     backgroundColor: Colors.primary,
     marginTop: 8,
   },

@@ -13,7 +13,18 @@
     "open_now": "Ouverts maintenant",
     "all_restaurants": "Tous les restaurants",
     "featured": "En vedette",
-    "no_results": "Aucun restaurant trouvé"
+    "no_results": "Aucun restaurant trouvé",
+    "status_open": "Ouvert",
+    "status_closed": "Fermé",
+    "reviews_count": "{{count}} avis",
+    "distance_km": "{{value}} km"
+  },
+  "location": {
+    "default_city": "Andorra la Vella",
+    "select_title": "Choisir le lieu",
+    "use_gps": "Utiliser ma position",
+    "gps_subtitle": "Basé sur le GPS, mis à jour automatiquement",
+    "choose_parish": "ou choisir une paroisse"
   },
   "search": {
     "recent": "Recherches récentes",
@@ -56,6 +67,13 @@
     "cancel_confirm": "Êtes-vous sûr de vouloir annuler ?",
     "share": "Partager",
     "no_slots": "Pas de disponibilité pour cette date",
+    "try_another_date": "Essayez une autre date ou moins de convives",
+    "loading_slots": "Recherche des horaires disponibles...",
+    "today": "Aujourd'hui",
+    "tomorrow": "Demain",
+    "lunch": "Déjeuner",
+    "dinner": "Dîner",
+    "new_reservation": "Nouvelle réservation",
     "step": "Étape {{current}} sur {{total}}",
     "next": "Suivant",
     "summary": "Résumé",
@@ -66,7 +84,9 @@
     "cancel_description": "Êtes-vous sûr ? Cette action est irréversible.",
     "cancel_yes": "Oui, annuler",
     "cancelled": "Réservation annulée",
-    "covers_available": "{{count}} disponible"
+    "covers_available": "{{count}} disponible",
+    "requests_placeholder": "Allergies, chaise haute, anniversaire...",
+    "status_label": "Statut"
   },
   "reservations": {
     "title": "Mes réservations",

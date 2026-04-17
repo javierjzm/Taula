@@ -12,6 +12,7 @@ export interface Reservation {
   restaurantName: string;
   restaurantCover: string | null;
   restaurantAddress: string;
+  restaurantSlug: string;
   date: string;
   time: string;
   partySize: number;
