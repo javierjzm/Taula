@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
+import { api } from '@/services/api';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -39,6 +40,15 @@ function LoginPrompt() {
         activeOpacity={0.8}
       >
         <Text style={styles.loginBtnText}>{t('auth.login')}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.loginRestaurantLink}
+        onPress={() => router.push('/register-restaurant')}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="storefront-outline" size={16} color={Colors.primary} />
+        <Text style={styles.loginRestaurantTxt}>{t('register_restaurant.cta_login')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -82,6 +92,29 @@ export default function ProfileScreen() {
           onPress: async () => {
             await logout();
             router.replace('/(tabs)');
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      t('profile.delete_account'),
+      t('profile.delete_confirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('profile.delete_account'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api('/me', { method: 'DELETE' });
+              await logout();
+              router.replace('/(tabs)');
+            } catch {
+              Alert.alert(t('common.error'));
+            }
           },
         },
       ],
@@ -151,12 +184,36 @@ export default function ProfileScreen() {
         </View>
 
         <TouchableOpacity
+          style={styles.restaurantCta}
+          onPress={() => router.push('/register-restaurant')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.restaurantCtaIcon}>
+            <Ionicons name="storefront-outline" size={20} color={Colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.restaurantCtaTitle}>{t('register_restaurant.cta_profile')}</Text>
+            <Text style={styles.restaurantCtaSub}>{t('register_restaurant.subtitle')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.logoutBtn}
           onPress={handleLogout}
           activeOpacity={0.7}
         >
           <Ionicons name="log-out-outline" size={20} color={Colors.error} />
           <Text style={styles.logoutText}>{t('auth.logout')}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={handleDeleteAccount}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={18} color={Colors.textTertiary} />
+          <Text style={styles.deleteText}>{t('profile.delete_account')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -266,6 +323,37 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
 
+  restaurantCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    gap: 12,
+  },
+  restaurantCtaIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restaurantCtaTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  restaurantCtaSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -283,6 +371,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: Colors.error,
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 20,
+    marginTop: 16,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  deleteText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.textTertiary,
+    textDecorationLine: 'underline',
   },
 
   loginAvatar: {
@@ -312,5 +415,17 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontWeight: '700',
     fontSize: 15,
+  },
+  loginRestaurantLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 8,
+  },
+  loginRestaurantTxt: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });

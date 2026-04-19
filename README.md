@@ -304,25 +304,36 @@ Los archivos de traduccion estan en `apps/mobile/i18n/locales/`.
 
 ## 8. Modelo de datos (resumen)
 
+El esquema completo esta en `packages/api/prisma/schema.prisma`. Resumen:
+
 ```
 User ─────────── Reservation ────── Restaurant
   │                   │                  │
-  └── Review ─────────┘                  ├── RestaurantOwner
-                      │                  ├── OpeningHours
-                      │                  ├── AvailabilitySlot
-                 BillingRecord           └── Review
+  └── Review ─────────┘                  ├── Zone / RestaurantTable / Service
+                      │                  ├── MenuCategory / MenuItem / Offer
+                 BillingRecord           ├── OpeningHours
+                      │                  └── Review
 ```
 
 - **User**: usuarios finales (email/Google/Apple auth)
-- **Restaurant**: restaurantes con geolocalizacion, horarios, imagenes
-- **AvailabilitySlot**: slots de 30 min con capacidad maxima
-- **Reservation**: reservas atomicas con codigo unico (`TAU-XXXX`)
+- **Restaurant**: datos del local, anti no-show (Stripe opcional), imagenes (Cloudinary opcional)
+- **Zone / RestaurantTable / Service**: configuracion del panel (mesas, turnos, duracion); la disponibilidad se calcula en servidor (`availability.service.ts`)
+- **Reservation**: codigo unico (`TAU-XXXX`), estados `PENDING` / `CONFIRMED`, asignacion de mesa cuando aplica
 - **Review**: resenas 1-5 estrellas (una por usuario/restaurante)
 - **BillingRecord**: facturacion por reserva (1.80 EUR/comensal)
 
 ---
 
-## 9. Troubleshooting
+## 9. Reservas y panel restaurante (backoffice)
+
+- **Disponibilidad**: la API calcula slots segun servicios activos, mesas y reservas existentes (incluye reservas pendientes sin mesa para evitar sobreventa). Al crear una reserva se validan antelacion minima/maxima (`minAdvanceMinutes`, `maxAdvanceDays` en el restaurante), que no sea en el pasado, y que no exista otra reserva activa del mismo usuario para el mismo restaurante, fecha y hora.
+- **Slots del dia actual**: para la fecha de hoy, la API no devuelve horarios ya pasados (respeta ademas la antelacion minima del restaurante).
+- **Agenda** (`/agenda`): vista timeline por mesas y vista lista; las reservas sin mesa asignada aparecen en una fila "Sense taula". Desde **Calendario** (`/calendar`), al pulsar un dia se abre la agenda con `?date=YYYY-MM-DD`.
+- **Opcionales en `.env`**: `STRIPE_*` (garantia anti no-show), `CLOUDINARY_*` (fotos menu y restaurante). Sin ellos la API arranca; las funciones que dependan de esos servicios quedan desactivadas o devuelven vacio.
+
+---
+
+## 10. Troubleshooting
 
 ### Docker no arranca / puerto ocupado
 ```bash

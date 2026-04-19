@@ -197,6 +197,16 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </Link>
           </View>
+
+          <TouchableOpacity
+            style={styles.restaurantCta}
+            onPress={() => router.push('/register-restaurant')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="storefront-outline" size={18} color={Colors.primary} />
+            <Text style={styles.restaurantCtaText}>{t('register_restaurant.cta_login')}</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -332,6 +342,21 @@ const styles = StyleSheet.create({
   footerLink: {
     fontSize: 14,
     fontWeight: '700',
+    color: Colors.primary,
+  },
+  restaurantCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    marginBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  restaurantCtaText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: Colors.primary,
   },
 });

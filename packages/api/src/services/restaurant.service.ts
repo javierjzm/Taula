@@ -38,7 +38,10 @@ export class RestaurantService {
 
     const restaurants = await this.prisma.restaurant.findMany({
       where,
-      include: { hours: true },
+      include: {
+        hours: true,
+        offers: { where: { isActive: true }, select: { id: true, title: true, type: true, value: true, endDate: true, daysOfWeek: true } },
+      },
       orderBy: [
         { isFeatured: 'desc' },
         { avgRating: 'desc' },
@@ -48,6 +51,8 @@ export class RestaurantService {
     });
 
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayOfWeek = now.getDay();
 
     return restaurants
       .map((r) => {
@@ -80,6 +85,16 @@ export class RestaurantService {
           distanceMeters,
           distance: distanceMeters != null ? Math.round((distanceMeters / 1000) * 10) / 10 : null,
           isOpen: this.checkIsOpen(r.hours, now),
+          activeOffer: (() => {
+            const valid = (r as any).offers?.filter((o: any) => {
+              if (o.endDate && o.endDate < today) return false;
+              if (o.daysOfWeek?.length > 0 && !o.daysOfWeek.includes(dayOfWeek)) return false;
+              return true;
+            }) ?? [];
+            if (valid.length === 0) return null;
+            const best = valid[0];
+            return { id: best.id, title: best.title, type: best.type, value: best.value };
+          })(),
         };
       })
       .filter((r) => {
@@ -109,27 +124,6 @@ export class RestaurantService {
       cuisine: restaurant.cuisineType.join(', '),
       isOpen: this.checkIsOpen(restaurant.hours, now),
     };
-  }
-
-  async getAvailableSlots(restaurantId: string, date: string, partySize: number) {
-    const targetDate = new Date(date);
-
-    const slots = await this.prisma.availabilitySlot.findMany({
-      where: {
-        restaurantId,
-        date: targetDate,
-        isBlocked: false,
-      },
-      orderBy: { time: 'asc' },
-    });
-
-    return slots
-      .filter((slot) => slot.maxCovers - slot.bookedCovers >= partySize)
-      .map((slot) => ({
-        id: slot.id,
-        time: slot.time,
-        availableCovers: slot.maxCovers - slot.bookedCovers,
-      }));
   }
 
   private checkIsOpen(

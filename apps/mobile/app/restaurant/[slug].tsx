@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Linking,
   Platform,
   Dimensions,
+  Share,
+  FlatList,
 } from 'react-native';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -16,21 +18,40 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CUISINE_TYPES } from '@/constants/andorra';
+import { getCuisineLabel } from '@/constants/andorra';
 import { Colors } from '@/constants/colors';
+import { useFavoritesStore } from '@/stores/favoritesStore';
 import { api } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
-import type {
-  RestaurantDetail,
-  OpeningHours,
-  ApiResponse,
-  PaginatedResponse,
-} from '@taula/shared';
+import type { ApiResponse, PaginatedResponse } from '@taula/shared';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_HEIGHT = 320;
+const { width: SW } = Dimensions.get('window');
+const HERO_H = 360;
+const GALLERY_SIZE = (SW - 52) / 3;
+
+interface Restaurant {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  cuisineType: string[];
+  cuisine: string;
+  priceRange: number;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  address: string;
+  parish: string;
+  latitude: number;
+  longitude: number;
+  coverImage: string | null;
+  images: string[];
+  avgRating: number;
+  reviewCount: number;
+  isOpen: boolean;
+  hours: { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }[];
+}
 
 interface Review {
   id: string;
@@ -41,24 +62,54 @@ interface Review {
   createdAt: string;
 }
 
-const DAY_KEYS: Record<number, string> = {
-  1: 'day_mon',
-  2: 'day_tue',
-  3: 'day_wed',
-  4: 'day_thu',
-  5: 'day_fri',
-  6: 'day_sat',
-  7: 'day_sun',
-};
+interface MenuCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  items: MenuItemData[];
+}
+interface MenuItemData {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image: string | null;
+  allergens: string[];
+  isPopular: boolean;
+}
+interface OfferData {
+  id: string;
+  title: string;
+  description: string | null;
+  type: 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_ITEM' | 'SPECIAL_MENU';
+  value: number;
+}
 
-function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
+/* ══════ QUICK ACTION BUTTON ══════ */
+
+function QuickAction({ icon, label, onPress, color }: {
+  icon: string; label: string; onPress: () => void; color?: string;
+}) {
+  return (
+    <TouchableOpacity style={s.qaBtn} onPress={onPress} activeOpacity={0.7}>
+      <View style={s.qaIconWrap}>
+        <Ionicons name={icon as any} size={20} color={color ?? Colors.primary} />
+      </View>
+      <Text style={s.qaLabel} numberOfLines={1}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+/* ══════ STAR ROW ══════ */
+
+function Stars({ rating }: { rating: number }) {
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map((i) => (
         <Ionicons
           key={i}
           name={i <= Math.round(rating) ? 'star' : 'star-outline'}
-          size={size}
+          size={13}
           color={Colors.star}
         />
       ))}
@@ -66,171 +117,72 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   );
 }
 
-function ReviewItem({ review }: { review: Review }) {
+/* ══════ REVIEW CARD ══════ */
+
+function ReviewCard({ review }: { review: Review }) {
   return (
-    <View style={st.reviewCard}>
-      <View style={st.reviewHeader}>
+    <View style={s.reviewCard}>
+      <View style={s.reviewTop}>
         {review.userAvatar ? (
-          <Image source={{ uri: review.userAvatar }} style={st.reviewAvatar} />
+          <Image source={{ uri: review.userAvatar }} style={s.reviewAvatar} />
         ) : (
-          <View style={[st.reviewAvatar, st.reviewAvatarPlaceholder]}>
-            <Text style={st.reviewAvatarLetter}>
-              {review.userName.charAt(0).toUpperCase()}
-            </Text>
+          <View style={[s.reviewAvatar, s.reviewAvatarFallback]}>
+            <Text style={s.reviewInitial}>{review.userName.charAt(0).toUpperCase()}</Text>
           </View>
         )}
         <View style={{ flex: 1 }}>
-          <Text style={st.reviewName}>{review.userName}</Text>
-          <Text style={st.reviewDate}>
-            {new Date(review.createdAt).toLocaleDateString()}
-          </Text>
+          <Text style={s.reviewName}>{review.userName}</Text>
+          <Text style={s.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
         </View>
-        <StarRow rating={review.rating} size={12} />
+        <Stars rating={review.rating} />
       </View>
-      {review.comment ? (
-        <Text style={st.reviewComment}>{review.comment}</Text>
-      ) : null}
+      {review.comment ? <Text style={s.reviewComment}>{review.comment}</Text> : null}
     </View>
   );
 }
 
-function RestaurantMiniMap({
-  latitude,
-  longitude,
-  name,
-  onPress,
-}: {
-  latitude: number;
-  longitude: number;
-  name: string;
-  onPress: () => void;
-}) {
-  const isExpoGo = Constants.appOwnership === 'expo';
-  if (Platform.OS === 'web' || isExpoGo) {
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={st.mapContainer}>
-        <View style={[st.miniMap, { backgroundColor: Colors.surfaceSecondary, justifyContent: 'center', alignItems: 'center' }]}>
-          <Ionicons name="map-outline" size={40} color={Colors.textTertiary} />
-          <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 8 }}>
-            {latitude.toFixed(4)}, {longitude.toFixed(4)}
-          </Text>
-        </View>
-        <Text style={st.mapLabel} numberOfLines={1}>
-          {name}
-        </Text>
-      </TouchableOpacity>
-    );
-  }
-
-  let MapboxGL: any;
-  try {
-    MapboxGL = require('@rnmapbox/maps').default;
-  } catch {
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={st.mapContainer}>
-        <View style={[st.miniMap, { backgroundColor: Colors.surfaceSecondary, justifyContent: 'center', alignItems: 'center' }]}>
-          <Ionicons name="map-outline" size={40} color={Colors.textTertiary} />
-          <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 8 }}>
-            {latitude.toFixed(4)}, {longitude.toFixed(4)}
-          </Text>
-        </View>
-        <Text style={st.mapLabel} numberOfLines={1}>
-          {name}
-        </Text>
-      </TouchableOpacity>
-    );
-  }
-
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={st.mapContainer}>
-      <MapboxGL.MapView
-        style={st.miniMap}
-        scrollEnabled={false}
-        pitchEnabled={false}
-        rotateEnabled={false}
-        zoomEnabled={false}
-        attributionEnabled={false}
-        logoEnabled={false}
-      >
-        <MapboxGL.Camera
-          centerCoordinate={[longitude, latitude]}
-          zoomLevel={15}
-          animationMode="none"
-        />
-        <MapboxGL.PointAnnotation id="restaurant-pin" coordinate={[longitude, latitude]}>
-          <View style={st.mapMarker}>
-            <Ionicons name="restaurant" size={14} color={Colors.white} />
-          </View>
-        </MapboxGL.PointAnnotation>
-      </MapboxGL.MapView>
-      <Text style={st.mapLabel} numberOfLines={1}>
-        {name}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-function HoursTable({ hours, t }: { hours: OpeningHours[]; t: (k: string) => string }) {
-  const today = new Date().getDay();
-  const todayIso = today === 0 ? 7 : today;
-  const sorted = [...hours].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-
-  return (
-    <View style={st.hoursTable}>
-      {sorted.map((h) => {
-        const isCurrent = h.dayOfWeek === todayIso;
-        const dayKey = DAY_KEYS[h.dayOfWeek] ?? 'day_mon';
-        return (
-          <View
-            key={h.dayOfWeek}
-            style={[st.hoursRow, isCurrent && st.hoursRowToday]}
-          >
-            <Text style={[st.hoursDay, isCurrent && st.hoursDayToday]}>
-              {t(`restaurant.${dayKey}`)}
-            </Text>
-            {isCurrent && (
-              <View style={st.todayDot} />
-            )}
-            <Text style={[st.hoursTime, isCurrent && st.hoursTimeToday]}>
-              {h.isClosed
-                ? t('restaurant.closed')
-                : `${h.openTime} – ${h.closeTime}`}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
+/* ═══════════ MAIN SCREEN ═══════════ */
 
 export default function RestaurantDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { requireAuth } = useAuth();
-  const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
+  const isFav = useFavoritesStore((st) => st.isFav);
+  const toggleFav = useFavoritesStore((st) => st.toggle);
+  const scrollRef = useRef<ScrollView>(null);
 
-  const {
-    data: restaurantRes,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
+  const { data: res, isLoading, isError, refetch } = useQuery({
     queryKey: ['restaurant', slug],
-    queryFn: () => api<ApiResponse<RestaurantDetail>>(`/restaurants/${slug}`),
+    queryFn: () => api<ApiResponse<Restaurant>>(`/restaurants/${slug}`),
     enabled: !!slug,
   });
 
-  const restaurant = restaurantRes?.data;
+  const restaurant = res?.data;
 
-  const { data: reviewsRes, isLoading: reviewsLoading } = useQuery({
+  const { data: reviewsRes } = useQuery({
     queryKey: ['reviews', slug],
-    queryFn: () =>
-      api<PaginatedResponse<Review>>(`/restaurants/${slug}/reviews`),
-    enabled: !!slug && activeTab === 'reviews',
+    queryFn: () => api<PaginatedResponse<Review>>(`/restaurants/${slug}/reviews`),
+    enabled: !!slug,
   });
-
   const reviews = reviewsRes?.data ?? [];
+
+  const { data: menuRes } = useQuery({
+    queryKey: ['menu', slug],
+    queryFn: () => api<ApiResponse<MenuCategory[]>>(`/restaurants/${slug}/menu`),
+    enabled: !!slug,
+  });
+  const menuCategories = menuRes?.data ?? [];
+  const hasMenu = menuCategories.some((c) => c.items.length > 0);
+
+  const { data: offersRes } = useQuery({
+    queryKey: ['offers', slug],
+    queryFn: () => api<ApiResponse<OfferData[]>>(`/restaurants/${slug}/offers`),
+    enabled: !!slug,
+  });
+  const offers = offersRes?.data ?? [];
+
+  const [expandedMenuCat, setExpandedMenuCat] = useState<string | null>(null);
 
   const handleReserve = () => {
     if (!restaurant) return;
@@ -250,624 +202,431 @@ export default function RestaurantDetailScreen() {
     Linking.openURL(url);
   };
 
+  const handleShare = async () => {
+    if (!restaurant) return;
+    try {
+      await Share.share({ message: `${restaurant.name} — Taula\nhttps://taula.ad/r/${slug}` });
+    } catch { /* noop */ }
+  };
+
+  /* ── Loading / Error ── */
   if (isLoading) {
     return (
-      <View style={st.centerScreen}>
+      <View style={s.center}>
         <Stack.Screen options={{ headerShown: false }} />
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={st.loadingText}>{t('common.loading')}</Text>
       </View>
     );
   }
-
   if (isError || !restaurant) {
     return (
-      <View style={st.centerScreen}>
+      <View style={s.center}>
         <Stack.Screen options={{ headerShown: false }} />
         <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
-        <Text style={st.errorText}>{t('common.error')}</Text>
-        <TouchableOpacity style={st.retryBtn} onPress={() => refetch()}>
-          <Text style={st.retryText}>{t('common.retry')}</Text>
+        <Text style={s.errTxt}>{t('common.error')}</Text>
+        <TouchableOpacity style={s.retryBtn} onPress={() => refetch()}>
+          <Text style={s.retryTxt}>{t('common.retry')}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  const allImages = [restaurant.coverImage, ...(restaurant.images ?? [])].filter(Boolean) as string[];
+  const fav = isFav(restaurant.id);
+
   return (
-    <View style={st.container}>
+    <View style={s.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <ScrollView
-        style={st.scrollView}
-        stickyHeaderIndices={[2]}
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
       >
-        {/* Hero image */}
-        <View style={st.hero}>
+        {/* ── HERO ── */}
+        <View style={s.hero}>
           {restaurant.coverImage ? (
-            <Image
-              source={{ uri: restaurant.coverImage }}
-              style={st.heroImage}
-              contentFit="cover"
-              transition={300}
-            />
+            <Image source={{ uri: restaurant.coverImage }} style={s.heroImg} contentFit="cover" transition={300} />
           ) : (
-            <View style={[st.heroImage, st.heroPlaceholder]}>
+            <View style={[s.heroImg, s.heroPlaceholder]}>
               <Ionicons name="restaurant-outline" size={56} color={Colors.textTertiary} />
             </View>
           )}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.6)', Colors.background]}
-            style={st.heroGradient}
-          />
-          <View style={[st.heroNav, { paddingTop: insets.top + 4 }]}>
-            <TouchableOpacity style={st.heroBtn} onPress={() => router.back()} hitSlop={12}>
-              <Ionicons name="chevron-back" size={24} color={Colors.white} />
+          <LinearGradient colors={['rgba(0,0,0,0.3)', 'transparent', 'rgba(0,0,0,0.75)', Colors.background]} locations={[0, 0.3, 0.75, 1]} style={s.heroGrad} />
+
+          {/* Nav */}
+          <View style={[s.heroNav, { paddingTop: insets.top + 4 }]}>
+            <TouchableOpacity style={s.heroCircle} onPress={() => router.back()} hitSlop={12}>
+              <Ionicons name="chevron-back" size={22} color={Colors.white} />
             </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Restaurant info header */}
-        <View style={st.infoHeader}>
-          <View style={st.nameRow}>
-            <Text style={st.name} numberOfLines={2}>{restaurant.name}</Text>
-          </View>
-
-          <View style={st.metaRow}>
-            <View style={st.ratingPill}>
-              <Ionicons name="star" size={14} color={Colors.star} />
-              <Text style={st.ratingValue}>{restaurant.avgRating.toFixed(1)}</Text>
-              <Text style={st.ratingCount}>({restaurant.reviewCount})</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity style={s.heroCircle} onPress={() => toggleFav(restaurant.id)}>
+                <Ionicons name={fav ? 'heart' : 'heart-outline'} size={20} color={fav ? Colors.error : Colors.white} />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.heroCircle} onPress={handleShare}>
+                <Ionicons name="share-outline" size={20} color={Colors.white} />
+              </TouchableOpacity>
             </View>
-            <Text style={st.priceDots}>
-              {'€'.repeat(restaurant.priceRange)}
-              <Text style={{ color: Colors.textTertiary }}>
-                {'€'.repeat(4 - restaurant.priceRange)}
-              </Text>
-            </Text>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {restaurant.cuisineType.map((c) => {
-              const match = CUISINE_TYPES.find((ct) => ct.id === c);
-              return (
-                <View key={c} style={st.cuisineChip}>
-                  <Text style={st.cuisineChipText}>{match ? match.label : c}</Text>
-                </View>
-              );
-            })}
-          </ScrollView>
-
-          <View style={st.addressRow}>
-            <Ionicons name="location-outline" size={15} color={Colors.accent} />
-            <Text style={st.addressText} numberOfLines={2}>{restaurant.address}</Text>
-          </View>
-        </View>
-
-        {/* Tab bar (sticky) */}
-        <View style={st.tabBarWrapper}>
-          <View style={st.tabBar}>
-            {(['info', 'reviews'] as const).map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[st.tab, activeTab === tab && st.tabActive]}
-                onPress={() => setActiveTab(tab)}
-              >
-                <Text style={[st.tabText, activeTab === tab && st.tabTextActive]}>
-                  {t(`restaurant.${tab}`)}
+          {/* Hero bottom info */}
+          <View style={s.heroBottom}>
+            {restaurant.isOpen != null && (
+              <View style={[s.statusBadge, !restaurant.isOpen && s.statusClosed]}>
+                <View style={[s.statusDot, !restaurant.isOpen && s.statusDotClosed]} />
+                <Text style={[s.statusTxt, !restaurant.isOpen && s.statusTxtClosed]}>
+                  {restaurant.isOpen ? t('restaurant.open_now') : t('restaurant.closed')}
                 </Text>
-              </TouchableOpacity>
-            ))}
+              </View>
+            )}
+            <Text style={s.heroName} numberOfLines={2}>{restaurant.name}</Text>
+            <View style={s.heroMeta}>
+              <View style={s.heroRating}>
+                <Ionicons name="star" size={14} color={Colors.star} />
+                <Text style={s.heroRatingTxt}>{restaurant.avgRating.toFixed(1)}</Text>
+                <Text style={s.heroReviews}>({restaurant.reviewCount})</Text>
+              </View>
+              <View style={s.heroDot} />
+              <Text style={s.heroCuisine}>
+                {restaurant.cuisineType.map((c) => getCuisineLabel(c, t)).join(' · ')}
+              </Text>
+              <View style={s.heroDot} />
+              <Text style={s.heroPrice}>{'€'.repeat(restaurant.priceRange)}</Text>
+            </View>
+            <View style={s.heroAddress}>
+              <Ionicons name="location-outline" size={14} color={Colors.primary} />
+              <Text style={s.heroAddressTxt} numberOfLines={1}>{restaurant.address}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Tab content */}
-        {activeTab === 'info' ? (
-          <View style={st.tabContent}>
-            {restaurant.description ? (
-              <View style={st.card}>
-                <Text style={st.descriptionText}>{restaurant.description}</Text>
-              </View>
-            ) : null}
+        {/* ── QUICK ACTIONS ── */}
+        <View style={s.qaRow}>
+          {restaurant.phone && (
+            <QuickAction icon="call-outline" label={t('restaurant.phone')} onPress={() => Linking.openURL(`tel:${restaurant.phone}`)} />
+          )}
+          <QuickAction icon="navigate-outline" label={t('restaurant.directions')} onPress={openMap} />
+          {restaurant.website && (
+            <QuickAction icon="globe-outline" label={t('restaurant.website')} onPress={() => Linking.openURL(restaurant.website!)} />
+          )}
+          <QuickAction icon="share-outline" label={t('restaurant.share')} onPress={handleShare} />
+        </View>
 
-            <View style={st.card}>
-              <Text style={st.cardTitle}>{t('restaurant.hours')}</Text>
-              <HoursTable hours={restaurant.hours} t={t} />
-            </View>
-
-            <View style={st.card}>
-              {restaurant.phone ? (
-                <TouchableOpacity
-                  style={st.contactRow}
-                  onPress={() => Linking.openURL(`tel:${restaurant.phone}`)}
-                >
-                  <View style={st.contactIconWrap}>
-                    <Ionicons name="call-outline" size={18} color={Colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={st.contactLabel}>{t('restaurant.phone')}</Text>
-                    <Text style={st.contactValue}>{restaurant.phone}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-                </TouchableOpacity>
-              ) : null}
-
-              {restaurant.website ? (
-                <TouchableOpacity
-                  style={[st.contactRow, { borderBottomWidth: 0 }]}
-                  onPress={() => Linking.openURL(restaurant.website!)}
-                >
-                  <View style={st.contactIconWrap}>
-                    <Ionicons name="globe-outline" size={18} color={Colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={st.contactLabel}>{t('restaurant.website')}</Text>
-                    <Text style={st.contactValue} numberOfLines={1}>
-                      {restaurant.website}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-
-            <View style={st.card}>
-              <Text style={st.cardTitle}>{t('restaurant.location')}</Text>
-              <RestaurantMiniMap
-                latitude={restaurant.latitude}
-                longitude={restaurant.longitude}
-                name={restaurant.address}
-                onPress={openMap}
-              />
-              <TouchableOpacity style={st.openMapBtn} onPress={openMap}>
-                <Ionicons name="navigate-outline" size={16} color={Colors.primary} />
-                <Text style={st.openMapText}>{t('restaurant.open_map')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <View style={st.tabContent}>
-            {reviewsLoading ? (
-              <View style={st.reviewsLoading}>
-                <ActivityIndicator size="small" color={Colors.primary} />
-              </View>
-            ) : reviews.length === 0 ? (
-              <View style={st.noReviews}>
-                <View style={st.noReviewsIcon}>
-                  <Ionicons name="chatbubble-outline" size={32} color={Colors.textTertiary} />
-                </View>
-                <Text style={st.noReviewsTitle}>{t('restaurant.no_reviews')}</Text>
-              </View>
-            ) : (
-              reviews.map((review) => <ReviewItem key={review.id} review={review} />)
-            )}
+        {/* ── ABOUT ── */}
+        {restaurant.description && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>{t('restaurant.about')}</Text>
+            <Text style={s.aboutTxt}>{restaurant.description}</Text>
           </View>
         )}
+
+        {/* ── GALLERY ── */}
+        {allImages.length > 1 && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>{t('restaurant.gallery')}</Text>
+            <FlatList
+              horizontal
+              data={allImages}
+              keyExtractor={(_, i) => String(i)}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+              renderItem={({ item, index }) => (
+                <Image
+                  source={{ uri: item }}
+                  style={[
+                    s.galleryImg,
+                    index === 0 && { borderTopLeftRadius: 14, borderBottomLeftRadius: 14 },
+                    index === allImages.length - 1 && { borderTopRightRadius: 14, borderBottomRightRadius: 14 },
+                  ]}
+                  contentFit="cover"
+                  transition={200}
+                />
+              )}
+            />
+          </View>
+        )}
+
+        {/* ── OFFERS ── */}
+        {offers.length > 0 && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>{t('restaurant.offers')}</Text>
+            <View style={s.offersWrap}>
+              {offers.map((offer) => {
+                const badge =
+                  offer.type === 'PERCENTAGE' ? `-${offer.value}%`
+                  : offer.type === 'FIXED_AMOUNT' ? `-${offer.value}€`
+                  : offer.type === 'SPECIAL_MENU' ? `${offer.value}€`
+                  : '🎁';
+                const icon =
+                  offer.type === 'PERCENTAGE' || offer.type === 'FIXED_AMOUNT' ? 'pricetag'
+                  : offer.type === 'SPECIAL_MENU' ? 'restaurant'
+                  : 'gift';
+                return (
+                  <View key={offer.id} style={s.offerRow}>
+                    <View style={s.offerIconWrap}>
+                      <Ionicons name={icon as any} size={14} color="#16A34A" />
+                    </View>
+                    <View style={s.offerContent}>
+                      <View style={s.offerTopRow}>
+                        <Text style={s.offerTitle} numberOfLines={1}>{offer.title}</Text>
+                        <View style={s.offerBadge}>
+                          <Text style={s.offerBadgeText}>{badge}</Text>
+                        </View>
+                      </View>
+                      {offer.description && (
+                        <Text style={s.offerDesc} numberOfLines={1}>{offer.description}</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* ── CARTA / MENÚ ── */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>{t('restaurant.menu')}</Text>
+          {hasMenu ? (
+            <View>
+              {menuCategories.filter((c) => c.items.length > 0).map((cat) => {
+                const isExpanded = expandedMenuCat === cat.id;
+                return (
+                  <View key={cat.id} style={s.menuCat}>
+                    <TouchableOpacity
+                      style={s.menuCatHeader}
+                      onPress={() => setExpandedMenuCat(isExpanded ? null : cat.id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.menuCatName}>{cat.name}</Text>
+                        <Text style={s.menuCatCount}>{cat.items.length} {cat.items.length === 1 ? 'plat' : 'plats'}</Text>
+                      </View>
+                      <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={Colors.textTertiary} />
+                    </TouchableOpacity>
+                    {isExpanded && cat.items.map((item) => (
+                      <View key={item.id} style={s.menuItem}>
+                        {item.image ? (
+                          <Image source={{ uri: item.image }} style={s.menuItemImg} contentFit="cover" transition={200} />
+                        ) : (
+                          <View style={[s.menuItemImg, s.menuItemImgPlaceholder]}>
+                            <Ionicons name="restaurant-outline" size={16} color={Colors.textTertiary} />
+                          </View>
+                        )}
+                        <View style={s.menuItemInfo}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={s.menuItemName} numberOfLines={1}>{item.name}</Text>
+                            {item.isPopular && (
+                              <View style={s.popularBadge}>
+                                <Ionicons name="star" size={10} color="#D97706" />
+                              </View>
+                            )}
+                          </View>
+                          {item.description && (
+                            <Text style={s.menuItemDesc} numberOfLines={2}>{item.description}</Text>
+                          )}
+                          {item.allergens.length > 0 && (
+                            <View style={s.allergenRow}>
+                              {item.allergens.slice(0, 4).map((a) => (
+                                <View key={a} style={s.allergenTag}>
+                                  <Text style={s.allergenText}>{a}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                        <Text style={s.menuItemPrice}>{item.price.toFixed(2)}€</Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={s.noMenuWrap}>
+              <Ionicons name="restaurant-outline" size={32} color={Colors.textTertiary} />
+              <Text style={s.menuNote}>{t('restaurant.menu_coming')}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── REVIEWS PREVIEW ── */}
+        <View style={s.section}>
+          <View style={s.sectionRow}>
+            <Text style={s.sectionTitle}>{t('restaurant.reviews')}</Text>
+            <View style={s.reviewSummary}>
+              <Ionicons name="star" size={14} color={Colors.star} />
+              <Text style={s.reviewSummaryTxt}>
+                {restaurant.avgRating.toFixed(1)} ({restaurant.reviewCount})
+              </Text>
+            </View>
+          </View>
+
+          {reviews.length > 0 ? (
+            <>
+              {reviews.slice(0, 3).map((r) => (
+                <ReviewCard key={r.id} review={r} />
+              ))}
+              {restaurant.reviewCount > 3 && (
+                <TouchableOpacity style={s.seeAllBtn} onPress={() => router.push(`/restaurant/reviews?slug=${slug}&name=${encodeURIComponent(restaurant.name)}`)}>
+                  <Text style={s.seeAllTxt}>{t('restaurant.see_all_reviews')}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            <View style={s.noReviews}>
+              <Ionicons name="chatbubble-outline" size={28} color={Colors.textTertiary} />
+              <Text style={s.noReviewsTxt}>{t('restaurant.be_first_review')}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── LOCATION MAP ── */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>{t('restaurant.location')}</Text>
+          <TouchableOpacity style={s.mapCard} onPress={openMap} activeOpacity={0.85}>
+            <View style={s.mapPlaceholder}>
+              <Ionicons name="map-outline" size={36} color={Colors.textTertiary} />
+              <Text style={s.mapCoords}>{restaurant.latitude.toFixed(4)}, {restaurant.longitude.toFixed(4)}</Text>
+            </View>
+            <View style={s.mapBottom}>
+              <Ionicons name="location" size={16} color={Colors.primary} />
+              <Text style={s.mapAddress} numberOfLines={1}>{restaurant.address}</Text>
+              <Ionicons name="open-outline" size={14} color={Colors.textTertiary} />
+            </View>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
-      {/* Bottom CTA */}
-      <View style={[st.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <TouchableOpacity style={st.reserveBtn} onPress={handleReserve} activeOpacity={0.85}>
-          <Ionicons name="calendar-outline" size={20} color={Colors.white} />
-          <Text style={st.reserveBtnText}>{t('restaurant.reserve')}</Text>
+      {/* ── BOTTOM CTA ── */}
+      <View style={[s.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View style={s.bottomInfo}>
+          <Text style={s.bottomPrice}>{'€'.repeat(restaurant.priceRange)}</Text>
+          <View style={s.bottomRating}>
+            <Ionicons name="star" size={12} color={Colors.star} />
+            <Text style={s.bottomRatingTxt}>{restaurant.avgRating.toFixed(1)}</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={s.reserveBtn} onPress={handleReserve} activeOpacity={0.85}>
+          <Text style={s.reserveTxt}>{t('restaurant.reserve')}</Text>
+          <Ionicons name="arrow-forward" size={18} color={Colors.textInverse} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const st = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  centerScreen: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-  },
-  errorText: {
-    fontSize: 16,
-    color: Colors.text,
-    fontWeight: '600',
-  },
-  retryBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    marginTop: 4,
-  },
-  retryText: {
-    color: Colors.white,
-    fontWeight: '600',
-    fontSize: 15,
-  },
+/* ═══════════ STYLES ═══════════ */
 
-  hero: {
-    width: SCREEN_WIDTH,
-    height: HERO_HEIGHT,
-    position: 'relative',
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
-  heroPlaceholder: {
-    backgroundColor: Colors.surfaceSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 140,
-  },
-  heroNav: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-  },
-  heroBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, gap: 12 },
+  errTxt: { fontSize: 16, color: Colors.text, fontWeight: '600' },
+  retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: Colors.primary, borderRadius: 14, marginTop: 4 },
+  retryTxt: { color: Colors.white, fontWeight: '600', fontSize: 15 },
 
-  infoHeader: {
-    backgroundColor: Colors.background,
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 18,
-    gap: 10,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  name: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.text,
-    letterSpacing: -0.5,
-    flex: 1,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  ratingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  ratingValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.star,
-  },
-  ratingCount: {
-    fontSize: 13,
-    color: Colors.textTertiary,
-    fontWeight: '500',
-  },
-  priceDots: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  cuisineChip: {
-    backgroundColor: Colors.primaryGlow,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  cuisineChipText: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  addressRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    marginTop: 2,
-  },
-  addressText: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
+  /* ── HERO ── */
+  hero: { width: SW, height: HERO_H, position: 'relative' },
+  heroImg: { width: '100%', height: '100%' },
+  heroPlaceholder: { backgroundColor: Colors.surfaceSecondary, justifyContent: 'center', alignItems: 'center' },
+  heroGrad: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  heroNav: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
+  heroCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  heroBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 4 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(52,211,153,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 6, marginBottom: 8 },
+  statusClosed: { backgroundColor: 'rgba(248,113,113,0.15)' },
+  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success },
+  statusDotClosed: { backgroundColor: Colors.error },
+  statusTxt: { fontSize: 12, fontWeight: '700', color: Colors.success },
+  statusTxtClosed: { color: Colors.error },
+  heroName: { fontSize: 28, fontWeight: '900', color: Colors.white, letterSpacing: -0.5, marginBottom: 6 },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  heroRating: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  heroRatingTxt: { fontSize: 14, fontWeight: '800', color: Colors.white },
+  heroReviews: { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
+  heroDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.35)' },
+  heroCuisine: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
+  heroPrice: { fontSize: 14, color: Colors.primary, fontWeight: '700' },
+  heroAddress: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  heroAddressTxt: { fontSize: 13, color: 'rgba(255,255,255,0.65)', flex: 1 },
 
-  tabBarWrapper: {
-    backgroundColor: Colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderBottomWidth: 2.5,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: Colors.primary,
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.textTertiary,
-  },
-  tabTextActive: {
-    color: Colors.primary,
-    fontWeight: '700',
-  },
+  /* ── QUICK ACTIONS ── */
+  qaRow: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 18, gap: 10 },
+  qaBtn: { flex: 1, alignItems: 'center', gap: 6 },
+  qaIconWrap: { width: 50, height: 50, borderRadius: 16, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  qaLabel: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary, textAlign: 'center' },
 
-  tabContent: {
-    paddingBottom: 16,
-    gap: 10,
-    paddingTop: 10,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: 16,
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 14,
-  },
-  descriptionText: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    lineHeight: 23,
-  },
+  /* ── SECTIONS ── */
+  section: { paddingHorizontal: 20, marginBottom: 24 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.text, letterSpacing: -0.3, marginBottom: 12 },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
 
-  hoursTable: {
-    gap: 2,
-  },
-  hoursRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-  },
-  hoursRowToday: {
-    backgroundColor: Colors.primaryGlow,
-  },
-  hoursDay: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-    width: 40,
-  },
-  hoursDayToday: {
-    color: Colors.primary,
-    fontWeight: '700',
-  },
-  todayDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: Colors.primary,
-    marginRight: 'auto',
-    marginLeft: 6,
-  },
-  hoursTime: {
-    fontSize: 14,
-    color: Colors.text,
-    fontWeight: '500',
-  },
-  hoursTimeToday: {
-    color: Colors.primary,
-    fontWeight: '700',
-  },
+  /* ── ABOUT ── */
+  aboutTxt: { fontSize: 15, color: Colors.textSecondary, lineHeight: 23 },
 
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    gap: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  contactIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: Colors.primaryGlow,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contactLabel: {
-    fontSize: 12,
-    color: Colors.textTertiary,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  contactValue: {
-    fontSize: 15,
-    color: Colors.text,
-    fontWeight: '600',
-  },
+  /* ── GALLERY ── */
+  galleryImg: { width: GALLERY_SIZE, height: GALLERY_SIZE, backgroundColor: Colors.surfaceSecondary },
 
-  mapContainer: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  miniMap: {
-    width: '100%',
-    height: 160,
-  },
-  mapMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2.5,
-    borderColor: Colors.white,
-  },
-  mapLabel: {
-    padding: 12,
-    fontSize: 13,
-    color: Colors.textSecondary,
-    backgroundColor: Colors.surface,
-    fontWeight: '500',
-  },
-  openMapBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 12,
-    backgroundColor: Colors.primaryGlow,
-    borderRadius: 14,
-  },
-  openMapText: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontWeight: '700',
-  },
+  /* ── OFFERS ── */
+  offersWrap: { gap: 6 },
+  offerRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: Colors.border, gap: 10 },
+  offerIconWrap: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#DCFCE7', justifyContent: 'center', alignItems: 'center' },
+  offerContent: { flex: 1, gap: 1 },
+  offerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  offerBadge: { backgroundColor: '#DCFCE7', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  offerBadgeText: { fontSize: 11, fontWeight: '800', color: '#16A34A' },
+  offerTitle: { fontSize: 13, fontWeight: '700', color: Colors.text, flex: 1 },
+  offerDesc: { fontSize: 11, color: Colors.textTertiary },
 
-  reviewsLoading: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  noReviews: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    gap: 10,
-  },
-  noReviewsIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.surfaceSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  noReviewsTitle: {
-    fontSize: 15,
-    color: Colors.textTertiary,
-    fontWeight: '500',
-  },
-  reviewCard: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  reviewAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-  },
-  reviewAvatarPlaceholder: {
-    backgroundColor: Colors.primaryGlow,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reviewAvatarLetter: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  reviewName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  reviewDate: {
-    fontSize: 12,
-    color: Colors.textTertiary,
-    marginTop: 1,
-  },
-  reviewComment: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 21,
-  },
+  /* ── MENU ── */
+  menuCat: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 10, overflow: 'hidden' },
+  menuCatHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  menuCatName: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  menuCatCount: { fontSize: 12, color: Colors.textTertiary, marginTop: 1 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.border, gap: 12 },
+  menuItemImg: { width: 56, height: 56, borderRadius: 12 },
+  menuItemImgPlaceholder: { backgroundColor: Colors.surfaceSecondary, justifyContent: 'center', alignItems: 'center' },
+  menuItemInfo: { flex: 1, gap: 2 },
+  menuItemName: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  menuItemDesc: { fontSize: 12, color: Colors.textTertiary, lineHeight: 17 },
+  menuItemPrice: { fontSize: 16, fontWeight: '800', color: Colors.primary, minWidth: 50, textAlign: 'right' },
+  popularBadge: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center' },
+  allergenRow: { flexDirection: 'row', gap: 4, marginTop: 3 },
+  allergenTag: { backgroundColor: '#FEF9C3', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  allergenText: { fontSize: 9, fontWeight: '600', color: '#A16207' },
+  noMenuWrap: { alignItems: 'center', paddingVertical: 24, gap: 10 },
+  menuNote: { fontSize: 12, color: Colors.textTertiary, textAlign: 'center', fontStyle: 'italic' },
 
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Colors.surface,
-    paddingTop: 12,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  reserveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    paddingVertical: 17,
-    borderRadius: 16,
-    gap: 10,
-    ...Colors.shadow.md,
-  },
-  reserveBtnText: {
-    color: Colors.white,
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
+  /* ── REVIEWS ── */
+  reviewSummary: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reviewSummaryTxt: { fontSize: 14, fontWeight: '700', color: Colors.star },
+  reviewCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 8 },
+  reviewTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  reviewAvatar: { width: 36, height: 36, borderRadius: 18 },
+  reviewAvatarFallback: { backgroundColor: Colors.primaryGlow, justifyContent: 'center', alignItems: 'center' },
+  reviewInitial: { fontSize: 15, fontWeight: '700', color: Colors.primary },
+  reviewName: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  reviewDate: { fontSize: 11, color: Colors.textTertiary, marginTop: 1 },
+  reviewComment: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21 },
+  noReviews: { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  noReviewsTxt: { fontSize: 13, color: Colors.textTertiary },
+  seeAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12, marginTop: 4 },
+  seeAllTxt: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+
+  /* ── MAP ── */
+  mapCard: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },
+  mapPlaceholder: { width: '100%', height: 140, backgroundColor: Colors.surfaceSecondary, justifyContent: 'center', alignItems: 'center' },
+  mapCoords: { fontSize: 12, color: Colors.textTertiary, marginTop: 6 },
+  mapBottom: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, backgroundColor: Colors.surface },
+  mapAddress: { flex: 1, fontSize: 13, color: Colors.text, fontWeight: '500' },
+
+  /* ── BOTTOM BAR ── */
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.surface, paddingTop: 12, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  bottomInfo: { gap: 2 },
+  bottomPrice: { fontSize: 16, fontWeight: '700', color: Colors.textSecondary },
+  bottomRating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  bottomRatingTxt: { fontSize: 13, fontWeight: '700', color: Colors.star },
+  reserveBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 16, gap: 8, ...Colors.shadow.md },
+  reserveTxt: { color: Colors.textInverse, fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
 });

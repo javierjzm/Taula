@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/colors';
-import { CUISINE_TYPES } from '@/constants/andorra';
+import { CUISINE_TYPES, getCuisineLabel } from '@/constants/andorra';
 import { useFiltersStore } from '@/stores/filtersStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
@@ -32,6 +32,12 @@ const GRID_GAP = 10;
 const GRID_CARD_W = (SW - 40 - GRID_GAP) / 2;
 const CAT_SIZE = 68;
 
+interface ActiveOffer {
+  id: string;
+  title: string;
+  type: string;
+  value: number;
+}
 interface Restaurant {
   id: string;
   slug: string;
@@ -46,16 +52,14 @@ interface Restaurant {
   distance?: number;
   isOpen?: boolean;
   offer?: string | null;
+  activeOffer?: ActiveOffer | null;
 }
 
 interface RestaurantsResponse {
   data: Restaurant[];
 }
 
-function cuisineLabel(id: string): string {
-  const match = CUISINE_TYPES.find((ct) => ct.id === id);
-  return match ? match.label : id;
-}
+// cuisineLabel is resolved inside components using getCuisineLabel(id, t)
 
 function priceLabel(range: number): string {
   return '€'.repeat(range);
@@ -171,7 +175,7 @@ function FeaturedCard({ item, index }: { item: Restaurant; index: number }) {
         <View style={h.featuredMeta}>
           <RatingPill rating={item.avgRating} count={item.reviewCount} />
           <View style={h.dot} />
-          <Text style={h.featuredCuisine}>{cuisineLabel(mainCuisine)}</Text>
+          <Text style={h.featuredCuisine}>{getCuisineLabel(mainCuisine, t)}</Text>
           {item.priceRange > 0 && (
             <>
               <View style={h.dot} />
@@ -184,7 +188,7 @@ function FeaturedCard({ item, index }: { item: Restaurant; index: number }) {
   );
 }
 
-/* ═══════ GRID CARD (2-col) ═══════ */
+/* ═══════ GRID CARD (2-col, Glovo style) ═══════ */
 
 function GridCard({ item }: { item: Restaurant }) {
   const { t } = useTranslation();
@@ -203,46 +207,45 @@ function GridCard({ item }: { item: Restaurant }) {
             <Ionicons name="restaurant-outline" size={28} color={Colors.textTertiary} />
           </View>
         )}
-        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={h.gridGrad} />
+        <LinearGradient colors={['rgba(0,0,0,0.1)', 'transparent', 'rgba(0,0,0,0.55)']} locations={[0, 0.35, 1]} style={h.gridGrad} />
 
-        {/* Heart */}
-        <View style={h.gridHeartWrap}>
-          <HeartBtn id={item.id} />
-        </View>
-
-        {/* Offer */}
+        {/* Top: offer + heart */}
         {item.offer && (
           <View style={h.gridOfferWrap}>
             <OfferBadge text={item.offer} />
           </View>
         )}
+        <View style={h.gridHeartWrap}>
+          <HeartBtn id={item.id} />
+        </View>
 
-        {/* Rating */}
-        {item.avgRating > 0 && (
-          <View style={h.gridRatingWrap}>
-            <Ionicons name="star" size={10} color={Colors.star} />
-            <Text style={h.gridRatingTxt}>{item.avgRating.toFixed(1)}</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={h.gridBody}>
-        <Text style={h.gridName} numberOfLines={1}>{item.name}</Text>
-        <Text style={h.gridCuisine} numberOfLines={1}>{cuisineLabel(mainCuisine)}</Text>
-        <View style={h.gridBottomRow}>
-          {item.reviewCount > 0 && (
-            <Text style={h.gridReviews}>{t('home.reviews_count', { count: item.reviewCount })}</Text>
+        {/* Bottom on image: rating + distance */}
+        <View style={h.gridImgBottom}>
+          {item.avgRating > 0 && (
+            <View style={h.gridRatingWrap}>
+              <Ionicons name="star" size={10} color={Colors.star} />
+              <Text style={h.gridRatingTxt}>{item.avgRating.toFixed(1)}</Text>
+            </View>
           )}
           {item.distance != null && (
-            <Text style={h.gridDist}>{t('home.distance_km', { value: item.distance.toFixed(1) })}</Text>
+            <View style={h.gridDistWrap}>
+              <Ionicons name="navigate" size={9} color={Colors.primary} />
+              <Text style={h.gridDistTxt}>{item.distance.toFixed(1)} km</Text>
+            </View>
           )}
         </View>
+      </View>
+
+      {/* Minimal text bar */}
+      <View style={h.gridBody}>
+        <Text style={h.gridName} numberOfLines={1}>{item.name}</Text>
+        <Text style={h.gridCuisine} numberOfLines={1}>{getCuisineLabel(mainCuisine, t)} · {priceLabel(item.priceRange)}</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-/* ═══════ FULL-WIDTH LIST CARD ═══════ */
+/* ═══════ FULL-WIDTH LIST CARD (Glovo style) ═══════ */
 
 function ListCard({ item }: { item: Restaurant }) {
   const { t } = useTranslation();
@@ -253,50 +256,57 @@ function ListCard({ item }: { item: Restaurant }) {
       onPress={() => router.push(`/restaurant/${item.slug}`)}
       activeOpacity={0.92}
     >
+      {/* Big image */}
       <View style={h.listImgWrap}>
         {item.coverImage ? (
           <Image source={{ uri: item.coverImage }} style={h.listImg} contentFit="cover" transition={200} />
         ) : (
           <View style={[h.listImg, h.placeholder]}>
-            <Ionicons name="restaurant-outline" size={28} color={Colors.textTertiary} />
+            <Ionicons name="restaurant-outline" size={36} color={Colors.textTertiary} />
           </View>
         )}
-        {/* Offer on image */}
+        <LinearGradient colors={['rgba(0,0,0,0.15)', 'transparent', 'rgba(0,0,0,0.5)']} locations={[0, 0.4, 1]} style={h.listGrad} />
+
+        {/* Top-left: offer */}
         {item.offer && (
           <View style={h.listOfferWrap}>
             <OfferBadge text={item.offer} />
           </View>
         )}
-      </View>
 
-      <View style={h.listBody}>
-        <View style={h.listTitleRow}>
-          <Text style={h.listName} numberOfLines={1}>{item.name}</Text>
+        {/* Top-right: heart */}
+        <View style={h.listHeartWrap}>
           <HeartBtn id={item.id} />
         </View>
 
-        <View style={h.listChipsRow}>
-          <View style={h.cuisineChip}>
-            <Text style={h.cuisineChipTxt}>{cuisineLabel(mainCuisine)}</Text>
+        {/* Bottom-left on image: rating pill */}
+        {item.avgRating > 0 && (
+          <View style={h.listImgRating}>
+            <Ionicons name="star" size={11} color={Colors.star} />
+            <Text style={h.listImgRatingTxt}>{item.avgRating.toFixed(1)}</Text>
+            <Text style={h.listImgRatingCount}>({item.reviewCount})</Text>
           </View>
-          {item.priceRange > 0 && (
-            <Text style={h.listPrice}>{priceLabel(item.priceRange)}</Text>
-          )}
+        )}
+
+        {/* Bottom-right on image: distance */}
+        {item.distance != null && (
+          <View style={h.listImgDist}>
+            <Ionicons name="navigate" size={10} color={Colors.primary} />
+            <Text style={h.listImgDistTxt}>{item.distance.toFixed(1)} km</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Compact bottom bar */}
+      <View style={h.listBody}>
+        <View style={h.listNameRow}>
+          <Text style={h.listName} numberOfLines={1}>{item.name}</Text>
           <OpenBadge isOpen={item.isOpen} />
         </View>
-
-        <View style={h.listBottom}>
-          <View style={h.listRatingRow}>
-            <Ionicons name="star" size={13} color={Colors.star} />
-            <Text style={h.listRatingTxt}>{item.avgRating.toFixed(1)}</Text>
-            <Text style={h.listReviewCount}>({item.reviewCount})</Text>
-          </View>
-          {item.distance != null && (
-            <View style={h.listDistRow}>
-              <Ionicons name="location-outline" size={12} color={Colors.primary} />
-              <Text style={h.listDist}>{t('home.distance_km', { value: item.distance.toFixed(1) })}</Text>
-            </View>
-          )}
+        <View style={h.listMetaRow}>
+          <Text style={h.listCuisine}>{getCuisineLabel(mainCuisine, t)}</Text>
+          <View style={h.listMetaDot} />
+          <Text style={h.listPrice}>{priceLabel(item.priceRange)}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -330,23 +340,33 @@ export default function HomeScreen() {
     },
   });
 
-  const all = restaurants?.data ?? [];
+  const rawAll = restaurants?.data ?? [];
+  const all = rawAll.map((r) => ({
+    ...r,
+    offer: r.offer ?? (r.activeOffer
+      ? r.activeOffer.type === 'PERCENTAGE' ? `-${r.activeOffer.value}%`
+        : r.activeOffer.type === 'FIXED_AMOUNT' ? `-${r.activeOffer.value}€`
+        : r.activeOffer.title
+      : null),
+  }));
   const nearby = all.filter((r) => r.distance != null && r.distance < 5).slice(0, 6);
   const topRated = [...all].sort((a, b) => b.avgRating - a.avgRating).slice(0, 6);
 
   const renderHeader = useCallback(
     () => (
       <View>
-        {/* ─── HEADER ─── */}
+        {/* ─── HEADER: logo | ubicación | perfil ─── */}
         <View style={h.header}>
-          <View>
-            <Text style={h.brand}>taula</Text>
-            <TouchableOpacity style={h.locationBtn} activeOpacity={0.7} onPress={() => setShowLocationSheet(true)}>
-              <Ionicons name={isGps ? 'navigate' : 'location'} size={14} color={Colors.primary} />
-              <Text style={h.locationTxt} numberOfLines={1}>{cityName}</Text>
-              <Ionicons name="chevron-down" size={14} color={Colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
+          <Text style={h.brand}>taula</Text>
+          <TouchableOpacity
+            style={h.locHeaderBtn}
+            activeOpacity={0.7}
+            onPress={() => setShowLocationSheet(true)}
+          >
+            <Ionicons name={isGps ? 'navigate' : 'location'} size={15} color={Colors.primary} />
+            <Text style={h.locHeaderCity} numberOfLines={1}>{cityName}</Text>
+            <Ionicons name="chevron-down" size={16} color={Colors.textTertiary} />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => (user ? router.push('/(tabs)/profile') : router.push('/(auth)/login'))}
             activeOpacity={0.7}
@@ -365,8 +385,6 @@ export default function HomeScreen() {
         <TouchableOpacity style={h.search} onPress={() => router.push('/search')} activeOpacity={0.8}>
           <Ionicons name="search" size={20} color={Colors.primary} />
           <Text style={h.searchTxt}>{t('home.search_placeholder')}</Text>
-          <View style={h.searchDivider} />
-          <Ionicons name="options-outline" size={18} color={Colors.textTertiary} />
         </TouchableOpacity>
 
         {/* ─── CATEGORY CIRCLES ─── */}
@@ -400,7 +418,7 @@ export default function HomeScreen() {
           <View style={h.sectionWrap}>
             <View style={h.sectionRow}>
               <Text style={h.sectionTitle}>{t('home.nearby')}</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/list?sort=nearby')}>
                 <Text style={h.seeAll}>{t('common.see_all')} →</Text>
               </TouchableOpacity>
             </View>
@@ -422,7 +440,7 @@ export default function HomeScreen() {
           <View style={h.sectionWrap}>
             <View style={h.sectionRow}>
               <Text style={h.sectionTitle}>{t('home.top_rated')}</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/list?sort=top_rated')}>
                 <Text style={h.seeAll}>{t('common.see_all')} →</Text>
               </TouchableOpacity>
             </View>
@@ -524,70 +542,76 @@ const h = StyleSheet.create({
   /* ── HEADER ── */
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 6,
     paddingBottom: 14,
+    gap: 10,
   },
   brand: {
     fontSize: 34,
     fontWeight: '900',
     color: Colors.primary,
     letterSpacing: -1.5,
+    flexShrink: 0,
   },
-  locationBtn: {
+  locHeaderBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    justifyContent: 'center',
+    minWidth: 0,
     gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  locationTxt: {
+  locHeaderCity: {
+    flexShrink: 1,
     fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '700',
+    color: Colors.text,
+    textAlign: 'center',
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: Colors.primary,
+    flexShrink: 0,
   },
   avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: Colors.border,
+    flexShrink: 0,
   },
 
   /* ── SEARCH ── */
   search: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceSecondary,
     marginHorizontal: 20,
-    borderRadius: 16,
-    height: 52,
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: 14,
+    height: 46,
+    paddingHorizontal: 14,
+    gap: 10,
+    marginBottom: 18,
   },
   searchTxt: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.textTertiary,
-  },
-  searchDivider: {
-    width: 1,
-    height: 22,
-    backgroundColor: Colors.border,
   },
 
   /* ── CATEGORIES ── */
@@ -724,18 +748,6 @@ const h = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cuisineChip: {
-    backgroundColor: Colors.primaryGlow,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  cuisineChipTxt: {
-    fontSize: 11,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-
   /* ═══ FEATURED CARD ═══ */
   featured: {
     width: FEATURED_W,
@@ -830,7 +842,7 @@ const h = StyleSheet.create({
   },
   gridCard: {
     width: GRID_CARD_W,
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: Colors.surface,
     borderWidth: 1,
@@ -838,73 +850,81 @@ const h = StyleSheet.create({
   },
   gridImgWrap: {
     position: 'relative',
+    width: '100%',
+    height: 130,
   },
   gridImg: {
     width: '100%',
-    height: 140,
+    height: '100%',
     backgroundColor: Colors.surfaceSecondary,
   },
   gridGrad: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    height: 50,
+    bottom: 0,
   },
   gridHeartWrap: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 7,
+    right: 7,
   },
   gridOfferWrap: {
     position: 'absolute',
-    bottom: 8,
-    left: 8,
+    top: 7,
+    left: 7,
+  },
+  gridImgBottom: {
+    position: 'absolute',
+    bottom: 7,
+    left: 7,
+    right: 7,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   gridRatingWrap: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.65)',
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 3,
-    borderRadius: 7,
+    borderRadius: 6,
     gap: 3,
   },
   gridRatingTxt: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: Colors.white,
   },
+  gridDistWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 2,
+  },
+  gridDistTxt: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
   gridBody: {
-    padding: 10,
-    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   gridName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: Colors.text,
   },
   gridCuisine: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.textSecondary,
-  },
-  gridBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  gridReviews: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-  },
-  gridDist: {
-    fontSize: 11,
-    color: Colors.primary,
-    fontWeight: '600',
+    marginTop: 1,
   },
 
   /* ═══ ALL RESTAURANTS DIVIDER ═══ */
@@ -928,13 +948,11 @@ const h = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  /* ═══ LIST CARD ═══ */
+  /* ═══ LIST CARD (Glovo-style) ═══ */
   listCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: Colors.surface,
     marginHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 12,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
@@ -942,74 +960,105 @@ const h = StyleSheet.create({
   },
   listImgWrap: {
     position: 'relative',
-    overflow: 'hidden',
+    width: '100%',
+    height: 170,
   },
   listImg: {
-    width: 110,
-    height: 110,
+    width: '100%',
+    height: '100%',
     backgroundColor: Colors.surfaceSecondary,
+  },
+  listGrad: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   listOfferWrap: {
     position: 'absolute',
-    bottom: 6,
-    left: 6,
+    top: 10,
+    left: 10,
+  },
+  listHeartWrap: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
+  listImgRating: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 3,
+  },
+  listImgRatingTxt: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.white,
+  },
+  listImgRatingCount: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  listImgDist: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 3,
+  },
+  listImgDistTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   listBody: {
-    flex: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    gap: 5,
   },
-  listTitleRow: {
+  listNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
   listName: {
     flex: 1,
     fontSize: 15,
     fontWeight: '700',
     color: Colors.text,
-    marginRight: 6,
   },
-  listChipsRow: {
+  listMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    marginTop: 3,
+  },
+  listCuisine: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  listMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textTertiary,
   },
   listPrice: {
     fontSize: 12,
     color: Colors.textTertiary,
-    fontWeight: '600',
-  },
-  listBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  listRatingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  listRatingTxt: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.star,
-  },
-  listReviewCount: {
-    fontSize: 12,
-    color: Colors.textTertiary,
-  },
-  listDistRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  listDist: {
-    fontSize: 12,
-    color: Colors.primary,
     fontWeight: '600',
   },
 

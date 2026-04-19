@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import multipart from '@fastify/multipart';
 import { prismaPlugin } from './plugins/prisma.plugin';
 import { redisPlugin } from './plugins/redis.plugin';
 import { corsPlugin } from './plugins/cors.plugin';
@@ -11,6 +12,8 @@ import { restaurantPanelRoutes } from './routes/restaurant-panel';
 import { adminRoutes } from './routes/admin';
 import { notificationRoutes } from './routes/notifications';
 import { AppError } from './utils/errors';
+import { NoShowCronService } from './services/noshow-cron.service';
+import { startReminderCron } from './jobs/reminders';
 
 const app = Fastify({
   logger: {
@@ -23,6 +26,7 @@ const app = Fastify({
 });
 
 app.register(corsPlugin);
+app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
 app.register(prismaPlugin);
 app.register(redisPlugin);
 
@@ -67,6 +71,16 @@ const start = async () => {
     const port = Number(process.env.PORT) || 3000;
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`Taula API running on port ${port}`);
+
+    const noShowCron = new NoShowCronService(app.prisma);
+    noShowCron.start();
+
+    try {
+      startReminderCron(app.prisma);
+      console.log('Reminder cron started');
+    } catch (err) {
+      app.log.warn('Reminder cron could not start (Redis/BullMQ may be unavailable)');
+    }
   } catch (err) {
     app.log.error(err);
     process.exit(1);

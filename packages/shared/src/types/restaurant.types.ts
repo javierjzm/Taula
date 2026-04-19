@@ -61,7 +61,7 @@ export interface OpeningHours {
 }
 
 export interface AvailableSlot {
-  id: string;
   time: string;
-  availableCovers: number;
+  serviceName: string;
+  availableTables: number;
 }

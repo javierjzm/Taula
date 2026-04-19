@@ -34,3 +34,13 @@ export const CUISINE_TYPES = [
   { id: 'brunch', emoji: '🥐', label: 'Brunch' },
   { id: 'fine_dining', emoji: '✨', label: 'Fine Dining' },
 ] as const;
+
+export function getCuisineLabel(id: string, t?: (key: string) => string): string {
+  const key = `cuisine.${id}`;
+  if (t) {
+    const translated = t(key);
+    if (translated !== key) return translated;
+  }
+  const match = CUISINE_TYPES.find((ct) => ct.id === id);
+  return match?.label ?? id;
+}

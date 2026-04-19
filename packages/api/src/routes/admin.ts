@@ -26,10 +26,6 @@ export const adminRoutes = async (fastify: FastifyInstance) => {
       data: { isActive: true },
     });
 
-    const { SlotService } = await import('../services/slot.service');
-    const slotService = new SlotService(fastify.prisma);
-    await slotService.generateSlotsForRestaurant(id);
-
     return { data: restaurant };
   });
 

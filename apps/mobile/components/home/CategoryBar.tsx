@@ -1,7 +1,8 @@
 import React from 'react';
 import { ScrollView, Pressable, Text, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '@/constants/colors';
-import { CUISINE_TYPES } from '@/constants/andorra';
+import { CUISINE_TYPES, getCuisineLabel } from '@/constants/andorra';
 
 interface CategoryBarProps {
   selected: string | null;
@@ -9,6 +10,7 @@ interface CategoryBarProps {
 }
 
 export default function CategoryBar({ selected, onSelect }: CategoryBarProps) {
+  const { t } = useTranslation();
   const handlePress = (id: string) => {
     onSelect(selected === id ? null : id);
   };
@@ -29,7 +31,7 @@ export default function CategoryBar({ selected, onSelect }: CategoryBarProps) {
           >
             <Text style={styles.emoji}>{cuisine.emoji}</Text>
             <Text style={[styles.label, isActive && styles.labelActive]}>
-              {cuisine.label}
+              {getCuisineLabel(cuisine.id, t)}
             </Text>
           </Pressable>
         );

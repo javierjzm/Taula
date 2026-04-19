@@ -1,14 +1,23 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Calendar, Clock, Store, BarChart3, LogOut, Menu, X } from 'lucide-react';
+import {
+  Calendar, CalendarDays, Settings2, CalendarOff,
+  BarChart3, MessageCircle, Store, LogOut, Menu,
+  UtensilsCrossed, Tag,
+} from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { to: '/agenda', label: 'Agenda', icon: Calendar },
-  { to: '/availability', label: 'Disponibilidad', icon: Clock },
+  { to: '/calendar', label: 'Calendari', icon: CalendarDays },
+  { to: '/menu', label: 'Carta', icon: UtensilsCrossed },
+  { to: '/offers', label: 'Ofertes', icon: Tag },
+  { to: '/setup', label: 'Configuració', icon: Settings2 },
+  { to: '/blocked-dates', label: 'Dies bloquejats', icon: CalendarOff },
+  { to: '/stats', label: 'Estadístiques', icon: BarChart3 },
+  { to: '/reviews', label: 'Ressenyes', icon: MessageCircle },
   { to: '/profile', label: 'Perfil', icon: Store },
-  { to: '/stats', label: 'Estadísticas', icon: BarChart3 },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

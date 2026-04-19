@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,18 +17,59 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import { Calendar, DateData } from 'react-native-calendars';
-import { format, addDays, isToday, isTomorrow, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import {
+  format,
+  addDays,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isBefore,
+  isAfter,
+  isSameDay,
+  isSameMonth,
+  isToday as isDateToday,
+  isTomorrow,
+  parseISO,
+} from 'date-fns';
+import { es, ca, fr, enUS } from 'date-fns/locale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { api } from '@/services/api';
 import type {
-  AvailableSlot,
   CreateReservationInput,
   Reservation,
   ApiResponse,
 } from '@taula/shared';
+
+let CardField: any = null;
+let confirmSetupIntentFn: any = null;
+try {
+  const stripeMod = require('@stripe/stripe-react-native');
+  CardField = stripeMod.CardField;
+  confirmSetupIntentFn = stripeMod.confirmSetupIntent;
+} catch {
+  // Stripe native not available (Expo Go)
+}
+
+interface SlotResult {
+  time: string;
+  serviceName: string;
+  availableTables: number;
+}
+
+interface ZoneOption {
+  id: string;
+  name: string;
+}
+
+interface RestaurantNoShowInfo {
+  noShowProtection: boolean;
+  noShowFeePerPerson: number;
+}
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -40,7 +81,7 @@ const PARTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20];
 function formatDateLabel(dateStr: string, t: (k: string) => string): string {
   try {
     const d = parseISO(dateStr);
-    if (isToday(d)) return t('reservation.today');
+    if (isDateToday(d)) return t('reservation.today');
     if (isTomorrow(d)) return t('reservation.tomorrow');
     return format(d, "EEE d 'de' MMM", { locale: es });
   } catch {
@@ -62,6 +103,126 @@ function SectionHeader({ icon, title, subtitle }: { icon: string; title: string;
   );
 }
 
+const LOCALE_MAP: Record<string, any> = { es, ca, fr, en: enUS };
+
+function SimpleCalendar({
+  selectedDate,
+  minDate,
+  maxDate,
+  onDayPress,
+}: {
+  selectedDate: string | null;
+  minDate: string;
+  maxDate: string;
+  onDayPress: (dateStr: string) => void;
+}) {
+  const initial = selectedDate ? parseISO(selectedDate) : new Date();
+  const [currentMonth, setCurrentMonth] = useState(initial);
+  const { i18n } = useTranslation();
+  const loc = LOCALE_MAP[i18n.language] ?? es;
+
+  const minD = parseISO(minDate);
+  const maxD = parseISO(maxDate);
+
+  const canPrev = isAfter(startOfMonth(currentMonth), minD);
+  const canNext = isBefore(endOfMonth(currentMonth), maxD);
+
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const days = eachDayOfInterval({ start: calStart, end: calEnd });
+
+  const dayHeaders = Array.from({ length: 7 }, (_, i) => {
+    const d = addDays(calStart, i);
+    return format(d, 'EEEEEE', { locale: loc }).toUpperCase();
+  });
+
+  return (
+    <View>
+      <View style={cs.header}>
+        <TouchableOpacity
+          onPress={() => canPrev && setCurrentMonth(subMonths(currentMonth, 1))}
+          style={[cs.arrow, !canPrev && cs.arrowDisabled]}
+          disabled={!canPrev}
+        >
+          <Ionicons name="chevron-back" size={20} color={canPrev ? Colors.primary : Colors.textTertiary} />
+        </TouchableOpacity>
+        <Text style={cs.monthLabel}>
+          {format(currentMonth, 'MMMM yyyy', { locale: loc }).replace(/^\w/, (c) => c.toUpperCase())}
+        </Text>
+        <TouchableOpacity
+          onPress={() => canNext && setCurrentMonth(addMonths(currentMonth, 1))}
+          style={[cs.arrow, !canNext && cs.arrowDisabled]}
+          disabled={!canNext}
+        >
+          <Ionicons name="chevron-forward" size={20} color={canNext ? Colors.primary : Colors.textTertiary} />
+        </TouchableOpacity>
+      </View>
+      <View style={cs.dayHeaderRow}>
+        {dayHeaders.map((h, i) => (
+          <Text key={i} style={cs.dayHeaderText}>{h}</Text>
+        ))}
+      </View>
+      <View style={cs.grid}>
+        {days.map((day, i) => {
+          const dateStr = format(day, 'yyyy-MM-dd');
+          const inMonth = isSameMonth(day, currentMonth);
+          const disabled = !inMonth || isBefore(day, minD) || isAfter(day, maxD);
+          const selected = selectedDate ? isSameDay(day, parseISO(selectedDate)) : false;
+          const today = isDateToday(day);
+          return (
+            <TouchableOpacity
+              key={i}
+              style={[cs.dayCell, selected && cs.dayCellSelected]}
+              onPress={() => !disabled && onDayPress(dateStr)}
+              disabled={disabled}
+              activeOpacity={0.6}
+            >
+              <Text
+                style={[
+                  cs.dayText,
+                  !inMonth && cs.dayTextHidden,
+                  disabled && inMonth && cs.dayTextDisabled,
+                  today && !selected && cs.dayTextToday,
+                  selected && cs.dayTextSelected,
+                ]}
+              >
+                {inMonth ? day.getDate() : ''}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const cs = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  arrow: { padding: 8 },
+  arrowDisabled: { opacity: 0.3 },
+  monthLabel: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  dayHeaderRow: { flexDirection: 'row', marginBottom: 8 },
+  dayHeaderText: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  dayCell: {
+    width: `${100 / 7}%` as any,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayCellSelected: {
+    backgroundColor: Colors.primary,
+    borderRadius: 999,
+  },
+  dayText: { fontSize: 15, fontWeight: '500', color: Colors.text },
+  dayTextHidden: { color: 'transparent' },
+  dayTextDisabled: { color: Colors.textTertiary },
+  dayTextToday: { color: Colors.primary, fontWeight: '700' },
+  dayTextSelected: { color: '#fff', fontWeight: '700' },
+});
+
 export default function NewReservationScreen() {
   const { restaurantId, slug, name } = useLocalSearchParams<{
     restaurantId: string;
@@ -74,20 +235,44 @@ export default function NewReservationScreen() {
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [partySize, setPartySize] = useState(2);
-  const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<SlotResult | null>(null);
+  const [selectedZone, setSelectedZone] = useState<string | undefined>(undefined);
   const [specialRequests, setSpecialRequests] = useState('');
   const [showCalendar, setShowCalendar] = useState(true);
   const [showRequests, setShowRequests] = useState(false);
+  const [cardComplete, setCardComplete] = useState(false);
+  const [savingCard, setSavingCard] = useState(false);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const maxDate = format(addDays(new Date(), 60), 'yyyy-MM-dd');
 
+  const { data: restaurantDetail } = useQuery({
+    queryKey: ['restaurant-detail', slug],
+    queryFn: () => api<ApiResponse<RestaurantNoShowInfo>>(`/restaurants/${slug}`),
+    enabled: !!slug,
+  });
+  const noShowProtection = restaurantDetail?.data?.noShowProtection ?? false;
+  const noShowFee = restaurantDetail?.data?.noShowFeePerPerson ?? 0;
+
+  const { data: zonesRes } = useQuery({
+    queryKey: ['zones', slug],
+    queryFn: () => api<ApiResponse<ZoneOption[]>>(`/restaurants/${slug}/zones`),
+    enabled: !!slug,
+  });
+  const zones = zonesRes?.data ?? [];
+
   const { data: slotsRes, isLoading: slotsLoading, isFetching } = useQuery({
-    queryKey: ['slots', slug, selectedDate, partySize],
-    queryFn: () =>
-      api<ApiResponse<AvailableSlot[]>>(
-        `/restaurants/${slug}/slots?date=${selectedDate}&partySize=${partySize}`,
-      ),
+    queryKey: ['slots', slug, selectedDate, partySize, selectedZone],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        date: selectedDate!,
+        partySize: String(partySize),
+      });
+      if (selectedZone) params.set('zoneId', selectedZone);
+      return api<ApiResponse<SlotResult[]>>(
+        `/restaurants/${slug}/slots?${params.toString()}`,
+      );
+    },
     enabled: !!selectedDate,
   });
 
@@ -95,7 +280,7 @@ export default function NewReservationScreen() {
 
   useEffect(() => {
     setSelectedSlot(null);
-  }, [selectedDate, partySize]);
+  }, [selectedDate, partySize, selectedZone]);
 
   const createMutation = useMutation({
     mutationFn: (input: CreateReservationInput) =>
@@ -111,45 +296,73 @@ export default function NewReservationScreen() {
     },
   });
 
-  const markedDates = useMemo(() => {
-    if (!selectedDate) return {};
-    return {
-      [selectedDate]: {
-        selected: true,
-        selectedColor: Colors.primary,
-        selectedTextColor: Colors.white,
-      },
-    };
-  }, [selectedDate]);
-
-  const handleDayPress = (day: DateData) => {
+  const handleDaySelect = (dateStr: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setSelectedDate(day.dateString);
+    setSelectedDate(dateStr);
     setShowCalendar(false);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(async () => {
     if (!selectedDate || !selectedSlot || !restaurantId) return;
-    createMutation.mutate({
-      restaurantId,
-      slotId: selectedSlot.id,
-      date: selectedDate,
-      time: selectedSlot.time,
-      partySize,
-      specialRequests: specialRequests.trim() || undefined,
-    });
-  };
 
-  const canConfirm = !!selectedDate && !!selectedSlot && partySize >= 1;
+    if (noShowProtection && CardField && confirmSetupIntentFn) {
+      setSavingCard(true);
+      try {
+        const setupRes = await api<ApiResponse<{ clientSecret: string }>>('/reservations/setup-intent', {
+          method: 'POST',
+        });
+        const { error, setupIntent } = await confirmSetupIntentFn(setupRes.data.clientSecret, {
+          paymentMethodType: 'Card',
+        });
+        if (error) {
+          Alert.alert(t('common.error'), error.message);
+          setSavingCard(false);
+          return;
+        }
+        const reservation = await createMutation.mutateAsync({
+          restaurantId,
+          date: selectedDate,
+          time: selectedSlot.time,
+          partySize,
+          zoneId: selectedZone,
+          specialRequests: specialRequests.trim() || undefined,
+        });
+        if (setupIntent?.paymentMethodId) {
+          await api(`/reservations/${reservation.data.id}/card-guarantee`, {
+            method: 'POST',
+            body: JSON.stringify({ paymentMethodId: setupIntent.paymentMethodId }),
+          });
+        }
+        setSavingCard(false);
+        router.replace(`/reservation/${reservation.data.id}`);
+      } catch (err: any) {
+        setSavingCard(false);
+        Alert.alert(t('common.error'), err.message);
+      }
+    } else {
+      createMutation.mutate({
+        restaurantId,
+        date: selectedDate,
+        time: selectedSlot.time,
+        partySize,
+        zoneId: selectedZone,
+        specialRequests: specialRequests.trim() || undefined,
+      });
+    }
+  }, [selectedDate, selectedSlot, restaurantId, noShowProtection, partySize, selectedZone, specialRequests]);
 
-  const lunchSlots = slots.filter((sl) => {
-    const h = parseInt(sl.time.split(':')[0], 10);
-    return h < 16;
-  });
-  const dinnerSlots = slots.filter((sl) => {
-    const h = parseInt(sl.time.split(':')[0], 10);
-    return h >= 16;
-  });
+  const needsCard = noShowProtection && !cardComplete;
+  const canConfirm = !!selectedDate && !!selectedSlot && partySize >= 1 && (!noShowProtection || !CardField || cardComplete);
+
+  const serviceGroups = useMemo(() => {
+    const groups: Record<string, SlotResult[]> = {};
+    for (const sl of slots) {
+      const key = sl.serviceName || 'default';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(sl);
+    }
+    return Object.entries(groups);
+  }, [slots]);
 
   return (
     <View style={[s.container, { paddingTop: insets.top }]}>
@@ -202,35 +415,58 @@ export default function NewReservationScreen() {
             </TouchableOpacity>
           ) : (
             <View style={s.calendarWrap}>
-              <Calendar
+              <SimpleCalendar
+                selectedDate={selectedDate}
                 minDate={today}
                 maxDate={maxDate}
-                markedDates={markedDates}
-                onDayPress={handleDayPress}
-                theme={{
-                  backgroundColor: 'transparent',
-                  calendarBackground: 'transparent',
-                  todayTextColor: Colors.primary,
-                  arrowColor: Colors.primary,
-                  selectedDayBackgroundColor: Colors.primary,
-                  selectedDayTextColor: Colors.white,
-                  dayTextColor: Colors.text,
-                  textDisabledColor: Colors.textTertiary,
-                  monthTextColor: Colors.text,
-                  textDayFontSize: 15,
-                  textMonthFontSize: 16,
-                  textDayHeaderFontSize: 12,
-                  textMonthFontWeight: '700',
-                  textDayFontWeight: '500',
-                  textDayHeaderFontWeight: '600',
-                  textSectionTitleColor: Colors.textSecondary,
-                }}
+                onDayPress={handleDaySelect}
               />
             </View>
           )}
         </View>
 
-        {/* 2. PARTY SIZE SECTION */}
+        {/* 2. ZONE SELECTOR (optional) */}
+        {selectedDate && zones.length > 1 && (
+          <View style={s.section}>
+            <SectionHeader
+              icon="location-outline"
+              title={t('reservation.select_zone')}
+              subtitle={zones.find((z) => z.id === selectedZone)?.name}
+            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.partyRow}
+            >
+              <TouchableOpacity
+                style={[s.zoneChip, !selectedZone && s.zoneChipActive]}
+                onPress={() => setSelectedZone(undefined)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.zoneChipText, !selectedZone && s.zoneChipTextActive]}>
+                  {t('common.all')}
+                </Text>
+              </TouchableOpacity>
+              {zones.map((zone) => {
+                const active = selectedZone === zone.id;
+                return (
+                  <TouchableOpacity
+                    key={zone.id}
+                    style={[s.zoneChip, active && s.zoneChipActive]}
+                    onPress={() => setSelectedZone(zone.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.zoneChipText, active && s.zoneChipTextActive]}>
+                      {zone.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* 3. PARTY SIZE SECTION */}
         {selectedDate && (
           <View style={s.section}>
             <SectionHeader
@@ -262,7 +498,7 @@ export default function NewReservationScreen() {
           </View>
         )}
 
-        {/* 3. TIME SLOTS SECTION */}
+        {/* 4. TIME SLOTS SECTION */}
         {selectedDate && (
           <View style={s.section}>
             <SectionHeader
@@ -286,70 +522,34 @@ export default function NewReservationScreen() {
               </View>
             ) : (
               <View>
-                {lunchSlots.length > 0 && (
-                  <View style={s.timeGroup}>
+                {serviceGroups.map(([serviceName, groupSlots]) => (
+                  <View key={serviceName} style={s.timeGroup}>
                     <View style={s.timeGroupLabel}>
-                      <Ionicons name="sunny-outline" size={14} color={Colors.warning} />
-                      <Text style={s.timeGroupText}>{t('reservation.lunch')}</Text>
+                      <Ionicons name="restaurant-outline" size={14} color={Colors.primary} />
+                      <Text style={s.timeGroupText}>{serviceName}</Text>
                     </View>
                     <View style={s.slotsGrid}>
-                      {lunchSlots.map((slot) => {
-                        const active = selectedSlot?.id === slot.id;
-                        const disabled = slot.availableCovers < partySize;
+                      {groupSlots.map((slot) => {
+                        const active = selectedSlot?.time === slot.time;
                         return (
                           <TouchableOpacity
-                            key={slot.id}
-                            style={[s.slotChip, active && s.slotChipActive, disabled && s.slotChipDisabled]}
-                            onPress={() => !disabled && setSelectedSlot(slot)}
-                            disabled={disabled}
+                            key={slot.time}
+                            style={[s.slotChip, active && s.slotChipActive]}
+                            onPress={() => setSelectedSlot(slot)}
                             activeOpacity={0.7}
                           >
-                            <Text style={[s.slotTime, active && s.slotTimeActive, disabled && s.slotTimeDisabled]}>
+                            <Text style={[s.slotTime, active && s.slotTimeActive]}>
                               {slot.time}
                             </Text>
-                            {!disabled && (
-                              <Text style={[s.slotAvail, active && s.slotAvailActive]}>
-                                {t('reservation.covers_available', { count: slot.availableCovers })}
-                              </Text>
-                            )}
+                            <Text style={[s.slotAvail, active && s.slotAvailActive]}>
+                              {slot.availableTables} {t('reservation.tables_available')}
+                            </Text>
                           </TouchableOpacity>
                         );
                       })}
                     </View>
                   </View>
-                )}
-                {dinnerSlots.length > 0 && (
-                  <View style={s.timeGroup}>
-                    <View style={s.timeGroupLabel}>
-                      <Ionicons name="moon-outline" size={14} color={Colors.accent} />
-                      <Text style={s.timeGroupText}>{t('reservation.dinner')}</Text>
-                    </View>
-                    <View style={s.slotsGrid}>
-                      {dinnerSlots.map((slot) => {
-                        const active = selectedSlot?.id === slot.id;
-                        const disabled = slot.availableCovers < partySize;
-                        return (
-                          <TouchableOpacity
-                            key={slot.id}
-                            style={[s.slotChip, active && s.slotChipActive, disabled && s.slotChipDisabled]}
-                            onPress={() => !disabled && setSelectedSlot(slot)}
-                            disabled={disabled}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[s.slotTime, active && s.slotTimeActive, disabled && s.slotTimeDisabled]}>
-                              {slot.time}
-                            </Text>
-                            {!disabled && (
-                              <Text style={[s.slotAvail, active && s.slotAvailActive]}>
-                                {t('reservation.covers_available', { count: slot.availableCovers })}
-                              </Text>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                )}
+                ))}
               </View>
             )}
           </View>
@@ -391,7 +591,49 @@ export default function NewReservationScreen() {
           </View>
         )}
 
-        {/* 5. SUMMARY */}
+        {/* 5. CARD GUARANTEE */}
+        {selectedDate && selectedSlot && noShowProtection && (
+          <View style={s.section}>
+            <SectionHeader
+              icon="shield-checkmark-outline"
+              title={t('reservation.card_guarantee')}
+              subtitle={`${noShowFee}€ / ${t('reservation.per_person')}`}
+            />
+            <View style={s.cardGuaranteeBanner}>
+              <View style={s.cardGuaranteeIconWrap}>
+                <Ionicons name="card-outline" size={24} color="#D97706" />
+              </View>
+              <Text style={s.cardGuaranteeText}>
+                {t('reservation.card_guarantee_info', { fee: noShowFee })}
+              </Text>
+            </View>
+            {CardField ? (
+              <View style={s.cardFieldWrap}>
+                <CardField
+                  postalCodeEnabled={false}
+                  placeholders={{ number: '4242 4242 4242 4242' }}
+                  cardStyle={{
+                    backgroundColor: Colors.surfaceSecondary,
+                    textColor: Colors.text,
+                    borderColor: Colors.border,
+                    borderWidth: 1,
+                    borderRadius: 12,
+                    fontSize: 15,
+                  }}
+                  style={s.cardField}
+                  onCardChange={(details: any) => setCardComplete(details.complete)}
+                />
+              </View>
+            ) : (
+              <View style={s.cardDevInfo}>
+                <Ionicons name="information-circle-outline" size={18} color={Colors.textTertiary} />
+                <Text style={s.cardDevInfoText}>{t('reservation.card_dev_mode')}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* 6. SUMMARY */}
         {canConfirm && (
           <View style={s.summaryCard}>
             <View style={s.summaryRow}>
@@ -417,20 +659,20 @@ export default function NewReservationScreen() {
         <TouchableOpacity
           style={[s.confirmBtn, !canConfirm && s.confirmBtnDisabled]}
           onPress={handleConfirm}
-          disabled={!canConfirm || createMutation.isPending}
+          disabled={!canConfirm || createMutation.isPending || savingCard}
           activeOpacity={0.85}
         >
-          {createMutation.isPending ? (
+          {createMutation.isPending || savingCard ? (
             <ActivityIndicator size="small" color={Colors.white} />
           ) : (
             <>
               <Ionicons
-                name="checkmark-circle"
+                name={noShowProtection ? 'shield-checkmark' : 'checkmark-circle'}
                 size={22}
                 color={canConfirm ? Colors.white : Colors.textTertiary}
               />
               <Text style={[s.confirmBtnText, !canConfirm && s.confirmBtnTextDisabled]}>
-                {t('reservation.confirm')}
+                {noShowProtection ? t('reservation.confirm_with_card') : t('reservation.confirm')}
               </Text>
             </>
           )}
@@ -653,8 +895,25 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryGlow,
     borderColor: Colors.primary,
   },
-  slotChipDisabled: {
-    opacity: 0.3,
+  zoneChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  zoneChipActive: {
+    backgroundColor: Colors.primaryGlow,
+    borderColor: Colors.primary,
+  },
+  zoneChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  zoneChipTextActive: {
+    color: Colors.primary,
   },
   slotTime: {
     fontSize: 16,
@@ -757,5 +1016,52 @@ const s = StyleSheet.create({
   },
   confirmBtnTextDisabled: {
     color: Colors.textTertiary,
+  },
+
+  cardGuaranteeBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+    marginBottom: 12,
+  },
+  cardGuaranteeIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FDE68A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardGuaranteeText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 19,
+    fontWeight: '500',
+  },
+  cardFieldWrap: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  cardField: {
+    width: '100%',
+    height: 50,
+  },
+  cardDevInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: 12,
+    padding: 14,
+  },
+  cardDevInfoText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.textTertiary,
+    lineHeight: 17,
   },
 });

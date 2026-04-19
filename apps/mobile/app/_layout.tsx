@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { useAuthStore } from '@/stores/authStore';
+import { useFavoritesStore } from '@/stores/favoritesStore';
 import { api } from '@/services/api';
 import '@/i18n';
 
@@ -50,7 +51,7 @@ async function registerPushToken() {
 
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     await api('/me/push-token', {
-      method: 'PUT',
+      method: 'POST',
       body: JSON.stringify({ token }),
     }).catch(() => {});
   } catch {
@@ -65,6 +66,7 @@ function RootLayoutInner() {
 
   useEffect(() => {
     loadSession();
+    useFavoritesStore.getState().load();
   }, [loadSession]);
 
   useEffect(() => {

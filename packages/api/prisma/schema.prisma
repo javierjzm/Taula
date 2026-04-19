@@ -21,12 +21,14 @@ model User {
   authProvider  String   @default("email")
   googleId      String?  @unique
   appleId       String?  @unique
-  pushToken     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  pushToken         String?
+  stripeCustomerId  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  reservations Reservation[]
-  reviews      Review[]
+  reservations  Reservation[]
+  reviews       Review[]
+  notifications Notification[]
 
   @@index([email])
   @@map("users")
@@ -34,36 +36,49 @@ model User {
 
 // ─── RESTAURANTES ────────────────────────────────────────────────
 model Restaurant {
-  id            String    @id @default(cuid())
-  name          String
-  slug          String    @unique
-  description   String?
-  cuisineType   String[]
-  priceRange    Int
-  phone         String?
-  email         String?
-  website       String?
-  address       String
-  parish        Parish
-  latitude      Float
-  longitude     Float
-  isActive      Boolean   @default(false)
-  isFeatured    Boolean   @default(false)
-  featuredUntil DateTime?
-  coverImage    String?
-  images        String[]
-  menuPdfUrl    String?
-  avgRating     Float     @default(0)
-  reviewCount   Int       @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  name              String
+  slug              String    @unique
+  description       String?
+  cuisineType       String[]
+  priceRange        Int
+  phone             String?
+  email             String?
+  website           String?
+  address           String
+  parish            Parish
+  latitude          Float
+  longitude         Float
+  isActive          Boolean   @default(false)
+  isFeatured        Boolean   @default(false)
+  featuredUntil     DateTime?
+  coverImage        String?
+  images            String[]
+  menuPdfUrl        String?
+  avgRating         Float     @default(0)
+  reviewCount       Int       @default(0)
+  requiresApproval    Boolean   @default(false)
+  minAdvanceMinutes   Int       @default(60)
+  maxAdvanceDays      Int       @default(30)
+  noShowProtection    Boolean   @default(false)
+  noShowFeePerPerson  Float     @default(10)
+  noShowGraceMins     Int       @default(15)
+  stripeAccountId     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  owner        RestaurantOwner?
-  hours        OpeningHours[]
-  reservations Reservation[]
-  reviews      Review[]
-  slots        AvailabilitySlot[]
-  billing      BillingRecord[]
+  owner          RestaurantOwner?
+  hours          OpeningHours[]
+  reservations   Reservation[]
+  reviews        Review[]
+  zones          Zone[]
+  tables         RestaurantTable[]
+  services       Service[]
+  blockedDates   BlockedDate[]
+  billing        BillingRecord[]
+  menuCategories MenuCategory[]
+  menuItems      MenuItem[]
+  offers         Offer[]
 
   @@index([parish])
   @@index([isFeatured])
@@ -108,46 +123,113 @@ model OpeningHours {
   @@map("opening_hours")
 }
 
-// ─── DISPONIBILIDAD ──────────────────────────────────────────────
-model AvailabilitySlot {
-  id           String     @id @default(cuid())
+// ─── ZONAS Y MESAS ───────────────────────────────────────────────
+model Zone {
+  id           String @id @default(cuid())
   restaurantId String
-  date         DateTime   @db.Date
-  time         String
+  name         String
+  sortOrder    Int    @default(0)
+
+  restaurant Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tables     RestaurantTable[]
+
+  @@index([restaurantId])
+  @@map("zones")
+}
+
+model RestaurantTable {
+  id           String  @id @default(cuid())
+  restaurantId String
+  zoneId       String
+  label        String
+  minCovers    Int     @default(1)
   maxCovers    Int
-  bookedCovers Int        @default(0)
-  isBlocked    Boolean    @default(false)
+  isActive     Boolean @default(true)
 
-  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id])
-  reservations Reservation[]
+  restaurant  Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  zone        Zone            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  assignments TableAssignment[]
 
-  @@unique([restaurantId, date, time])
+  @@index([restaurantId])
+  @@index([zoneId])
+  @@map("restaurant_tables")
+}
+
+// ─── SERVICIOS (COMIDA / CENA) ───────────────────────────────────
+model Service {
+  id           String  @id @default(cuid())
+  restaurantId String
+  name         String
+  startTime    String
+  endTime      String
+  slotInterval Int     @default(30)
+  turnDuration Int     @default(90)
+  daysOfWeek   Int[]
+  isActive     Boolean @default(true)
+
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  blockedDates BlockedDate[]
+
+  @@index([restaurantId])
+  @@map("services")
+}
+
+// ─── DIAS BLOQUEADOS ─────────────────────────────────────────────
+model BlockedDate {
+  id           String   @id @default(cuid())
+  restaurantId String
+  date         DateTime @db.Date
+  reason       String?
+  isFullDay    Boolean  @default(true)
+  serviceId    String?
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  service    Service?   @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
   @@index([restaurantId, date])
-  @@map("availability_slots")
+  @@map("blocked_dates")
+}
+
+// ─── ASIGNACION DE MESAS ─────────────────────────────────────────
+model TableAssignment {
+  id            String @id @default(cuid())
+  reservationId String @unique
+  tableId       String
+
+  reservation Reservation    @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  table       RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@index([tableId])
+  @@map("table_assignments")
 }
 
 // ─── RESERVAS ────────────────────────────────────────────────────
 model Reservation {
-  id              String            @id @default(cuid())
-  code            String            @unique
-  userId          String
-  restaurantId    String
-  slotId          String
-  date            DateTime          @db.Date
-  time            String
-  partySize       Int
-  specialRequests String?
-  status          ReservationStatus @default(CONFIRMED)
-  reminderSent24h Boolean           @default(false)
-  reminderSent2h  Boolean           @default(false)
-  reviewRequested Boolean           @default(false)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                    String            @id @default(cuid())
+  code                  String            @unique
+  userId                String
+  restaurantId          String
+  date                  DateTime          @db.Date
+  time                  String
+  partySize             Int
+  zoneId                String?
+  specialRequests       String?
+  status                ReservationStatus @default(CONFIRMED)
+  cardGuarantee         Boolean           @default(false)
+  stripePaymentMethodId String?
+  stripePaymentIntentId String?
+  noShowCharged         Boolean           @default(false)
+  noShowAmount          Float?
+  reminderSent24h       Boolean           @default(false)
+  reminderSent2h        Boolean           @default(false)
+  reviewRequested       Boolean           @default(false)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
-  user       User             @relation(fields: [userId], references: [id])
-  restaurant Restaurant       @relation(fields: [restaurantId], references: [id])
-  slot       AvailabilitySlot @relation(fields: [slotId], references: [id])
-  billing    BillingRecord?
+  user            User             @relation(fields: [userId], references: [id])
+  restaurant      Restaurant       @relation(fields: [restaurantId], references: [id])
+  tableAssignment TableAssignment?
+  billing         BillingRecord?
 
   @@index([userId])
   @@index([restaurantId])
@@ -156,6 +238,7 @@ model Reservation {
 }
 
 enum ReservationStatus {
+  PENDING
   CONFIRMED
   ARRIVED
   NO_SHOW
@@ -180,6 +263,92 @@ model Review {
   @@unique([userId, restaurantId])
   @@index([restaurantId])
   @@map("reviews")
+}
+
+// ─── CARTA / MENÚ ───────────────────────────────────────────────
+model MenuCategory {
+  id           String @id @default(cuid())
+  restaurantId String
+  name         String
+  description  String?
+  sortOrder    Int    @default(0)
+  isActive     Boolean @default(true)
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items      MenuItem[]
+
+  @@index([restaurantId])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id           String  @id @default(cuid())
+  restaurantId String
+  categoryId   String
+  name         String
+  description  String?
+  price        Float
+  image        String?
+  allergens    String[]
+  tags         String[]
+  isAvailable  Boolean @default(true)
+  isPopular    Boolean @default(false)
+  sortOrder    Int     @default(0)
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([categoryId])
+  @@map("menu_items")
+}
+
+// ─── OFERTAS / DESCUENTOS ───────────────────────────────────────
+model Offer {
+  id           String    @id @default(cuid())
+  restaurantId String
+  title        String
+  description  String?
+  type         OfferType
+  value        Float
+  minCovers    Int       @default(1)
+  daysOfWeek   Int[]
+  startDate    DateTime? @db.Date
+  endDate      DateTime? @db.Date
+  startTime    String?
+  endTime      String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@map("offers")
+}
+
+enum OfferType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_ITEM
+  SPECIAL_MENU
+}
+
+// ─── NOTIFICACIONES IN-APP ────────────────────────────────────────
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      String   @default("general")
+  data      Json?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
 }
 
 // ─── FACTURACIÓN ─────────────────────────────────────────────────

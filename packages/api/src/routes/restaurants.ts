@@ -42,18 +42,47 @@ export const restaurantRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/:slug/slots', async (request, reply) => {
     const { slug } = z.object({ slug: z.string() }).parse(request.params);
-    const { date, partySize } = z
+    const { date, partySize, zoneId } = z
       .object({
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         partySize: z.coerce.number().int().min(1).max(20),
+        zoneId: z.string().optional(),
       })
       .parse(request.query);
 
     const restaurant = await service.findBySlug(slug);
     if (!restaurant) return reply.code(404).send({ message: 'Restaurante no encontrado' });
 
-    const slots = await service.getAvailableSlots(restaurant.id, date, partySize);
+    const { AvailabilityService } = await import('../services/availability.service');
+    const availabilityService = new AvailabilityService(fastify.prisma);
+    let slots = await availabilityService.getAvailableSlots(restaurant.id, date, partySize, zoneId);
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    if (date === todayStr) {
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const minAdvance = restaurant.minAdvanceMinutes ?? 0;
+      const cutoff = currentMinutes + Math.max(minAdvance, 30);
+      slots = slots.filter((s) => {
+        const [h, m] = s.time.split(':').map(Number);
+        return h * 60 + m >= cutoff;
+      });
+    }
+
     return { data: slots };
+  });
+
+  fastify.get('/:slug/zones', async (request, reply) => {
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const restaurant = await service.findBySlug(slug);
+    if (!restaurant) return reply.code(404).send({ message: 'Restaurante no encontrado' });
+
+    const zones = await fastify.prisma.zone.findMany({
+      where: { restaurantId: restaurant.id },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, name: true },
+    });
+    return { data: zones };
   });
 
   fastify.get('/:slug/reviews', async (request) => {
@@ -69,5 +98,55 @@ export const restaurantRoutes = async (fastify: FastifyInstance) => {
     const reviewService = new ReviewService(fastify.prisma);
     const reviews = await reviewService.findByRestaurant(restaurant.id, cursor, limit);
     return { data: reviews };
+  });
+
+  // ─── CARTA ─────────────────────────────────────────────────────
+  fastify.get('/:slug/menu', async (request, reply) => {
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const restaurant = await service.findBySlug(slug);
+    if (!restaurant) return reply.code(404).send({ message: 'Restaurante no encontrado' });
+
+    const categories = await fastify.prisma.menuCategory.findMany({
+      where: { restaurantId: restaurant.id, isActive: true },
+      include: {
+        items: {
+          where: { isAvailable: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return { data: categories };
+  });
+
+  // ─── OFERTAS ACTIVAS ──────────────────────────────────────────
+  fastify.get('/:slug/offers', async (request, reply) => {
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const restaurant = await service.findBySlug(slug);
+    if (!restaurant) return reply.code(404).send({ message: 'Restaurante no encontrado' });
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayOfWeek = now.getDay();
+
+    const offers = await fastify.prisma.offer.findMany({
+      where: {
+        restaurantId: restaurant.id,
+        isActive: true,
+        OR: [
+          { startDate: null },
+          { startDate: { lte: today } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const filtered = offers.filter((o) => {
+      if (o.endDate && o.endDate < today) return false;
+      if (o.daysOfWeek.length > 0 && !o.daysOfWeek.includes(dayOfWeek)) return false;
+      return true;
+    });
+
+    return { data: filtered };
   });
 };

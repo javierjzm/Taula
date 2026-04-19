@@ -13,13 +13,14 @@ import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import { CUISINE_TYPES } from '@/constants/andorra';
+import { getCuisineLabel } from '@/constants/andorra';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { PARISHES } from '@/constants/andorra';
 import { api } from '@/services/api';
 import { storage } from '@/services/storage';
+import { useLocation } from '@/hooks/useLocation';
 import type { RestaurantListItem, PaginatedResponse } from '@taula/shared';
 
 const RECENT_KEY = 'taula_recent_searches';
@@ -41,6 +42,7 @@ function RestaurantCardV({
   item: RestaurantListItem;
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       {item.coverImage ? (
@@ -71,14 +73,11 @@ function RestaurantCardV({
           </Text>
         </View>
         <View style={styles.cardChips}>
-          {item.cuisineType.slice(0, 2).map((c) => {
-            const match = CUISINE_TYPES.find((ct) => ct.id === c);
-            return (
+          {item.cuisineType.slice(0, 2).map((c) => (
               <View key={c} style={styles.cuisineChip}>
-                <Text style={styles.cuisineChipText}>{match ? match.label : c}</Text>
+                <Text style={styles.cuisineChipText}>{getCuisineLabel(c, t)}</Text>
               </View>
-            );
-          })}
+          ))}
           <Text style={styles.parishText}>
             {item.parish}
           </Text>
@@ -95,6 +94,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [parish, setParish] = useState<string | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const { location } = useLocation();
   const debouncedQuery = useDebounce(query.trim(), 300);
 
   useEffect(() => {
@@ -127,15 +127,18 @@ export default function SearchScreen() {
     const p = new URLSearchParams();
     if (debouncedQuery) p.set('q', debouncedQuery);
     if (parish) p.set('parish', parish);
+    p.set('lat', String(location.latitude));
+    p.set('lon', String(location.longitude));
     p.set('limit', '20');
     return p.toString();
   };
 
+  const hasQuery = debouncedQuery.length >= 2;
+
   const { data, isLoading } = useQuery({
-    queryKey: ['search', debouncedQuery, parish],
+    queryKey: ['search', debouncedQuery, parish, location.latitude, location.longitude],
     queryFn: () =>
       api<PaginatedResponse<RestaurantListItem>>(`/restaurants?${buildParams()}`),
-    enabled: debouncedQuery.length >= 2,
   });
 
   const results = data?.data ?? [];
@@ -144,10 +147,6 @@ export default function SearchScreen() {
     if (debouncedQuery) saveRecent(debouncedQuery);
     router.push(`/restaurant/${item.slug}`);
   };
-
-  const showRecent = !debouncedQuery && recentSearches.length > 0;
-  const showEmpty = !debouncedQuery && recentSearches.length === 0;
-  const showNoResults = debouncedQuery.length >= 2 && !isLoading && results.length === 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -205,53 +204,59 @@ export default function SearchScreen() {
         ))}
       </ScrollView>
 
-      {isLoading && debouncedQuery.length >= 2 && (
+      {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
-      )}
-
-      {showEmpty && (
-        <View style={styles.center}>
-          <View style={styles.emptyIconWrap}>
-            <Ionicons name="search-outline" size={48} color={Colors.textTertiary} />
-          </View>
-          <Text style={styles.emptyText}>{t('search.start_typing')}</Text>
-        </View>
-      )}
-
-      {showRecent && (
-        <View style={styles.recentSection}>
-          <View style={styles.recentHeader}>
-            <Text style={styles.recentTitle}>{t('search.recent')}</Text>
-            <TouchableOpacity onPress={clearRecent}>
-              <Text style={styles.clearText}>{t('search.clear')}</Text>
-            </TouchableOpacity>
-          </View>
-          {recentSearches.map((term, i) => (
-            <TouchableOpacity
-              key={`${term}-${i}`}
-              style={styles.recentItem}
-              onPress={() => setQuery(term)}
-            >
-              <Ionicons name="time-outline" size={18} color={Colors.textTertiary} />
-              <Text style={styles.recentText}>{term}</Text>
-              <Ionicons name="arrow-forward" size={16} color={Colors.textTertiary} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {showNoResults && (
-        <View style={styles.center}>
-          <View style={styles.emptyIconWrap}>
-            <Ionicons name="restaurant-outline" size={48} color={Colors.textTertiary} />
-          </View>
-          <Text style={styles.emptyText}>{t('search.no_results')}</Text>
-        </View>
-      )}
-
-      {results.length > 0 && (
+      ) : !hasQuery && !parish ? (
+        <ScrollView
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 16 }]}
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
+          {recentSearches.length > 0 && (
+            <View style={styles.recentSection}>
+              <View style={styles.recentHeader}>
+                <Text style={styles.recentTitle}>{t('search.recent')}</Text>
+                <TouchableOpacity onPress={clearRecent}>
+                  <Text style={styles.clearText}>{t('search.clear')}</Text>
+                </TouchableOpacity>
+              </View>
+              {recentSearches.map((term, i) => (
+                <TouchableOpacity
+                  key={`${term}-${i}`}
+                  style={styles.recentItem}
+                  onPress={() => setQuery(term)}
+                >
+                  <Ionicons name="time-outline" size={18} color={Colors.textTertiary} />
+                  <Text style={styles.recentText}>{term}</Text>
+                  <Ionicons name="arrow-forward" size={16} color={Colors.textTertiary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {results.length > 0 && (
+            <>
+              <Text style={styles.recentTitle}>{t('search.browse_all')}</Text>
+              {results.map((item) => (
+                <RestaurantCardV
+                  key={item.id}
+                  item={item}
+                  onPress={() => handleResultPress(item)}
+                />
+              ))}
+            </>
+          )}
+          {results.length === 0 && recentSearches.length === 0 && (
+            <View style={styles.center}>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="search-outline" size={48} color={Colors.textTertiary} />
+              </View>
+              <Text style={styles.emptyText}>{t('search.start_typing')}</Text>
+            </View>
+          )}
+        </ScrollView>
+      ) : results.length > 0 ? (
         <FlatList
           data={results}
           keyExtractor={(item) => item.id}
@@ -262,6 +267,13 @@ export default function SearchScreen() {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         />
+      ) : (
+        <View style={styles.center}>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="restaurant-outline" size={48} color={Colors.textTertiary} />
+          </View>
+          <Text style={styles.emptyText}>{t('search.no_results')}</Text>
+        </View>
       )}
     </View>
   );

@@ -4,7 +4,8 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/colors';
-import { CUISINE_TYPES } from '@/constants/andorra';
+import { useTranslation } from 'react-i18next';
+import { getCuisineLabel } from '@/constants/andorra';
 
 export interface Restaurant {
   id: string;
@@ -25,6 +26,7 @@ interface RestaurantCardHProps {
 
 export default function RestaurantCardH({ restaurant }: RestaurantCardHProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <Pressable
@@ -54,10 +56,9 @@ export default function RestaurantCardH({ restaurant }: RestaurantCardHProps) {
         {restaurant.cuisineType.length > 0 && (
           <View style={styles.cuisineRow}>
             {restaurant.cuisineType.slice(0, 2).map((c) => {
-              const match = CUISINE_TYPES.find((ct) => ct.id === c);
               return (
                 <View key={c} style={styles.cuisineBadge}>
-                  <Text style={styles.cuisineText}>{match ? match.label : c}</Text>
+                  <Text style={styles.cuisineText}>{getCuisineLabel(c, t)}</Text>
                 </View>
               );
             })}

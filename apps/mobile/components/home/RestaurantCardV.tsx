@@ -4,7 +4,8 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/colors';
-import { CUISINE_TYPES } from '@/constants/andorra';
+import { useTranslation } from 'react-i18next';
+import { getCuisineLabel } from '@/constants/andorra';
 import type { Restaurant } from './RestaurantCardH';
 
 interface RestaurantCardVProps {
@@ -23,6 +24,7 @@ function renderPrice(range?: number): string {
 
 export default function RestaurantCardV({ restaurant }: RestaurantCardVProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <Pressable
@@ -42,14 +44,11 @@ export default function RestaurantCardV({ restaurant }: RestaurantCardVProps) {
         </Text>
 
         <View style={styles.cuisineRow}>
-          {restaurant.cuisineType.slice(0, 2).map((c) => {
-            const match = CUISINE_TYPES.find((ct) => ct.id === c);
-            return (
+          {restaurant.cuisineType.slice(0, 2).map((c) => (
               <Text key={c} style={styles.cuisineText}>
-                {match ? match.label : c}
+                {getCuisineLabel(c, t)}
               </Text>
-            );
-          })}
+          ))}
           {restaurant.priceRange ? (
             <Text style={styles.price}>{renderPrice(restaurant.priceRange)}</Text>
           ) : null}

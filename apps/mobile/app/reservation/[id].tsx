@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -21,12 +22,104 @@ import { api } from '@/services/api';
 import type { Reservation, ApiResponse } from '@taula/shared';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
+  PENDING: { bg: Colors.warningLight, text: Colors.warning, icon: 'time' },
   CONFIRMED: { bg: Colors.successLight, text: Colors.success, icon: 'checkmark-circle' },
   ARRIVED: { bg: Colors.accentLight, text: Colors.accent, icon: 'restaurant' },
   NO_SHOW: { bg: Colors.warningLight, text: Colors.warning, icon: 'alert-circle' },
   CANCELLED_USER: { bg: Colors.errorLight, text: Colors.error, icon: 'close-circle' },
   CANCELLED_RESTAURANT: { bg: Colors.errorLight, text: Colors.error, icon: 'close-circle' },
 };
+
+function ReviewForm({ restaurantId, onSuccess }: { restaurantId: string; onSuccess: () => void }) {
+  const { t } = useTranslation();
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async () => {
+    if (rating === 0) return;
+    setSubmitting(true);
+    try {
+      await api('/reviews', {
+        method: 'POST',
+        body: JSON.stringify({ restaurantId, rating, comment: comment.trim() || undefined }),
+      });
+      setSubmitted(true);
+      onSuccess();
+    } catch (err: any) {
+      const msg = err?.message ?? '';
+      if (msg.includes('409') || msg.includes('Ya has dejado')) {
+        Alert.alert(t('reservation.review_already'));
+        setSubmitted(true);
+      } else {
+        Alert.alert(t('common.error'), msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <View style={s.reviewCard}>
+        <View style={s.reviewDoneWrap}>
+          <Ionicons name="checkmark-circle" size={32} color={Colors.success} />
+          <Text style={s.reviewDoneTxt}>{t('reservation.review_success')}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.reviewCard}>
+      <View style={s.reviewHeader}>
+        <Ionicons name="star" size={18} color={Colors.star} />
+        <Text style={s.reviewTitle}>{t('reservation.leave_review')}</Text>
+      </View>
+
+      <View style={s.starsRow}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <TouchableOpacity key={i} onPress={() => setRating(i)} hitSlop={6} activeOpacity={0.7}>
+            <Ionicons
+              name={i <= rating ? 'star' : 'star-outline'}
+              size={36}
+              color={i <= rating ? Colors.star : Colors.textTertiary}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+      {rating === 0 && (
+        <Text style={s.starHint}>{t('reservation.review_tap_stars')}</Text>
+      )}
+
+      <TextInput
+        style={s.reviewInput}
+        placeholder={t('reservation.review_placeholder')}
+        placeholderTextColor={Colors.textTertiary}
+        value={comment}
+        onChangeText={setComment}
+        multiline
+        numberOfLines={3}
+        textAlignVertical="top"
+        maxLength={500}
+      />
+
+      <TouchableOpacity
+        style={[s.reviewSubmit, rating === 0 && s.reviewSubmitDisabled]}
+        onPress={handleSubmit}
+        disabled={submitting || rating === 0}
+        activeOpacity={0.85}
+      >
+        {submitting ? (
+          <ActivityIndicator size="small" color={Colors.textInverse} />
+        ) : (
+          <Text style={s.reviewSubmitTxt}>{t('reservation.review_submit')}</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function ReservationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -139,6 +232,8 @@ export default function ReservationDetailScreen() {
 
   const statusInfo = STATUS_COLORS[reservation.status] ?? STATUS_COLORS.CONFIRMED;
   const isConfirmed = reservation.status === 'CONFIRMED';
+  const isPending = reservation.status === 'PENDING';
+  const canCancel = isConfirmed || isPending;
 
   return (
     <View style={[s.container, { paddingTop: insets.top }]}>
@@ -216,7 +311,38 @@ export default function ReservationDetailScreen() {
               </Text>
             </View>
           </View>
+
+          {(reservation as any).cardGuarantee && (
+            <>
+              <View style={s.detailDivider} />
+              <View style={s.cardGuaranteeRow}>
+                <Ionicons name="shield-checkmark" size={16} color="#D97706" />
+                <Text style={s.cardGuaranteeLabel}>{t('reservation.card_guarantee')}</Text>
+              </View>
+            </>
+          )}
+
+          {(reservation as any).noShowCharged && (
+            <>
+              <View style={s.detailDivider} />
+              <View style={s.noShowChargeRow}>
+                <Ionicons name="warning" size={16} color={Colors.error} />
+                <Text style={s.noShowChargeText}>
+                  {t('reservation.noshow_charged', { amount: (reservation as any).noShowAmount?.toFixed(2) || '0' })}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
+
+        {reservation.status === 'ARRIVED' && reservation.restaurantId && (
+          <ReviewForm
+            restaurantId={reservation.restaurantId}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['reservation', id] });
+            }}
+          />
+        )}
 
         <View style={s.actions}>
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.7}>
@@ -224,7 +350,7 @@ export default function ReservationDetailScreen() {
             <Text style={s.shareBtnText}>{t('reservation.share')}</Text>
           </TouchableOpacity>
 
-          {isConfirmed && (
+          {canCancel && (
             <TouchableOpacity
               style={s.cancelBtn}
               onPress={handleCancel}
@@ -498,6 +624,99 @@ const s = StyleSheet.create({
   cancelBtnText: {
     fontSize: 16,
     fontWeight: '700',
+    color: Colors.error,
+  },
+
+  reviewCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: Colors.primary + '40',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  reviewTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  starHint: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: Colors.textTertiary,
+    marginBottom: 12,
+  },
+  reviewInput: {
+    backgroundColor: Colors.background,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    color: Colors.text,
+    minHeight: 80,
+    marginTop: 8,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  reviewSubmit: {
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewSubmitDisabled: {
+    opacity: 0.4,
+  },
+  reviewSubmitTxt: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textInverse,
+  },
+  reviewDoneWrap: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  reviewDoneTxt: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  cardGuaranteeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  cardGuaranteeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#D97706',
+  },
+  noShowChargeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.errorLight,
+    borderRadius: 10,
+    padding: 10,
+  },
+  noShowChargeText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
     color: Colors.error,
   },
 });

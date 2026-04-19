@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, parseISO } from 'date-fns';
+import { es, ca, fr, enUS } from 'date-fns/locale';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
@@ -23,6 +24,7 @@ interface ReservationsResponse {
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; icon: string }> = {
+  PENDING: { bg: Colors.warningLight, text: Colors.warning, icon: 'time' },
   CONFIRMED: { bg: Colors.successLight, text: Colors.success, icon: 'checkmark-circle' },
   ARRIVED: { bg: Colors.accentLight, text: Colors.accent, icon: 'restaurant' },
   NO_SHOW: { bg: Colors.warningLight, text: Colors.warning, icon: 'alert-circle' },
@@ -55,8 +57,11 @@ function safeParse(dateStr: string): Date {
   return new Date(dateStr + 'T00:00:00');
 }
 
+const DATE_LOCALES: Record<string, any> = { es, ca, fr, en: enUS };
+
 function ReservationCard({ item }: { item: Reservation }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = DATE_LOCALES[i18n.language] ?? es;
   const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.CONFIRMED;
   const d = safeParse(item.date);
 
@@ -69,7 +74,7 @@ function ReservationCard({ item }: { item: Reservation }) {
       <View style={styles.cardLeft}>
         <View style={styles.dateBox}>
           <Text style={styles.dateDay}>{format(d, 'dd')}</Text>
-          <Text style={styles.dateMonth}>{format(d, 'MMM')}</Text>
+          <Text style={styles.dateMonth}>{format(d, 'MMM', { locale })}</Text>
         </View>
       </View>
       <View style={styles.cardBody}>
@@ -143,8 +148,24 @@ export default function ReservationsScreen() {
   }
 
   const all = reservations?.data ?? [];
-  const upcoming = all.filter((r) => r.status === 'CONFIRMED');
-  const past = all.filter((r) => r.status !== 'CONFIRMED');
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const upcoming = all
+    .filter((r) => {
+      const d = safeParse(r.date);
+      d.setHours(0, 0, 0, 0);
+      return d >= now && (r.status === 'PENDING' || r.status === 'CONFIRMED' || r.status === 'ARRIVED');
+    })
+    .sort((a, b) => safeParse(a.date).getTime() - safeParse(b.date).getTime());
+
+  const past = all
+    .filter((r) => {
+      const d = safeParse(r.date);
+      d.setHours(0, 0, 0, 0);
+      return d < now || (r.status !== 'PENDING' && r.status !== 'CONFIRMED' && r.status !== 'ARRIVED');
+    })
+    .sort((a, b) => safeParse(b.date).getTime() - safeParse(a.date).getTime());
 
   const sections = [
     ...(upcoming.length ? [{ title: t('reservations.upcoming'), data: upcoming }] : []),
