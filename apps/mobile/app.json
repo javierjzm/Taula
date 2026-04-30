@@ -17,7 +17,8 @@
       "bundleIdentifier": "ad.taula.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Necessitem la teva ubicació per mostrar-te restaurants a prop teu."
+        "NSLocationWhenInUseUsageDescription": "Necessitem la teva ubicació per mostrar-te restaurants a prop teu.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -27,7 +28,10 @@
       },
       "package": "ad.taula.app",
       "permissions": [
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
@@ -57,9 +61,11 @@
       "expo-secure-store"
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "0ecadffc-823e-45d2-bea6-5918fbea5694"
       }
-    }
+    },
+    "owner": "javierjzm"
   }
 }

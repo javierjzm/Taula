@@ -365,8 +365,12 @@ const RESTAURANTS_SEED: RestaurantSeed[] = [
     phone: '+376 878 901', email: 'reservations@elceller.ad', website: 'https://elceller.ad',
     address: 'Carrer Prat de la Creu, 8, Andorra la Vella', parish: 'ANDORRA_LA_VELLA',
     latitude: 42.5058, longitude: 1.5210, isActive: true, isFeatured: true,
-    coverImage: 'https://images.unsplash.com/photo-1550966871-3ed3cdb51f3a?w=800&h=600&fit=crop',
-    images: ['https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop'],
+    coverImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop',
+    ],
     avgRating: 4.9, reviewCount: 142,
     hours: [
       { dayOfWeek: 0, openTime: '19:00', closeTime: '23:00', isClosed: true },
@@ -615,10 +619,440 @@ const RESTAURANTS_SEED: RestaurantSeed[] = [
       { title: 'Menú brasa premium', description: 'Entrant + carn/peix + postre + copa de vi', type: 'SPECIAL_MENU', value: 48, daysOfWeek: [5, 6] },
     ],
   },
+  {
+    name: 'Cal Pau',
+    slug: 'cal-pau',
+    description: 'Cuina de mercat amb tapes creatives i producte del país en una borda acollidora.',
+    cuisineType: ['tapas', 'mediterranean'],
+    priceRange: 2,
+    phone: '+376 891 001',
+    email: 'info@calpau.ad',
+    website: 'https://calpau.ad',
+    address: 'Carrer Major, 44, Ordino',
+    parish: 'ORDINO',
+    latitude: 42.5565,
+    longitude: 1.5332,
+    isActive: true,
+    isFeatured: false,
+    coverImage: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.3,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({
+      dayOfWeek: i,
+      openTime: '13:00',
+      closeTime: '22:30',
+      isClosed: i === 1,
+    })),
+    zones: [{ name: 'Sala', tables: [
+      { label: 'P1', minCovers: 2, maxCovers: 4 }, { label: 'P2', minCovers: 2, maxCovers: 4 }, { label: 'P3', minCovers: 2, maxCovers: 6 },
+    ]}],
+    services: [
+      { name: 'Dinar', startTime: '13:00', endTime: '16:00', slotInterval: 30, turnDuration: 90, daysOfWeek: [0, 2, 3, 4, 5, 6] },
+      { name: 'Sopar', startTime: '20:00', endTime: '22:30', slotInterval: 30, turnDuration: 90, daysOfWeek: [0, 2, 3, 4, 5, 6] },
+    ],
+    menu: [
+      { name: 'Tapes', sortOrder: 0, items: [
+        { name: 'Croquetes de pernil', description: 'Trio amb allioli', price: 9, image: 'https://images.unsplash.com/photo-1630384060421-cb20d0e0649d?w=600&h=400&fit=crop', allergens: ['gluten', 'dairy'], isPopular: true },
+        { name: 'Musclos al vapor', description: 'Amb vi blanc i julivert', price: 14, image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&h=400&fit=crop', allergens: ['molluscs'] },
+      ]},
+      { name: 'Principals', sortOrder: 1, items: [
+        { name: 'Pollastre rostit', description: 'Amb escalivada', price: 18, image: 'https://images.unsplash.com/photo-1598103442097-8b74394b95c6?w=600&h=400&fit=crop' },
+        { name: 'Fricandó de vedella', description: 'Amb bolets', price: 19, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&h=400&fit=crop', allergens: ['gluten'], isPopular: true },
+      ]},
+    ],
+    offers: [{ title: '-10% sopars', description: 'Dimarts a dijous', type: 'PERCENTAGE', value: 10, daysOfWeek: [2, 3, 4], startTime: '20:00', endTime: '22:30' }],
+  },
+  {
+    name: 'Fondue Pyrénées',
+    slug: 'fondue-pyrenees',
+    description: 'Raclette, fondue savoiarda i formatges suïssos amb vins de muntanya.',
+    cuisineType: ['fine_dining', 'mediterranean'],
+    priceRange: 3,
+    phone: '+376 891 002',
+    email: 'contacte@fonduepyrenees.ad',
+    website: 'https://fonduepyrenees.ad',
+    address: 'Carretera General, 22, Canillo',
+    parish: 'CANILLO',
+    latitude: 42.5668,
+    longitude: 1.5995,
+    isActive: true,
+    isFeatured: false,
+    coverImage: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.5,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i, openTime: '19:00', closeTime: '23:00', isClosed: i === 1 || i === 2 })),
+    zones: [{ name: 'Sala', tables: [
+      { label: 'F1', minCovers: 2, maxCovers: 4 }, { label: 'F2', minCovers: 2, maxCovers: 4 }, { label: 'F3', minCovers: 4, maxCovers: 8 },
+    ]}],
+    services: [{ name: 'Sopar', startTime: '19:30', endTime: '22:30', slotInterval: 30, turnDuration: 120, daysOfWeek: [0, 3, 4, 5, 6] }],
+    menu: [
+      { name: 'Fondues', sortOrder: 0, items: [
+        { name: 'Fondue savoiarda', description: 'Formatges Emmental i Gruyère, pa artesà', price: 28, image: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=600&h=400&fit=crop', allergens: ['dairy', 'gluten'], isPopular: true },
+        { name: 'Raclette tradicional', description: 'Embotits i patates confitades', price: 26, image: 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=600&h=400&fit=crop', allergens: ['dairy'] },
+      ]},
+      { name: 'Postres', sortOrder: 1, items: [
+        { name: 'Tarta de formatge', description: 'Amb fruits vermells', price: 9, image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&h=400&fit=crop', allergens: ['dairy', 'eggs', 'gluten'] },
+      ]},
+    ],
+    offers: [{ title: 'Menú fondue per 2', description: 'Fondue + begudes', type: 'SPECIAL_MENU', value: 62, daysOfWeek: [5, 6] }],
+  },
+  {
+    name: 'Cafè Plaça',
+    slug: 'cafe-placa',
+    description: 'Especialitat en cafè de torrador local, pastisseria francesa i esmorzars tardans.',
+    cuisineType: ['brunch', 'healthy'],
+    priceRange: 1,
+    phone: '+376 891 003',
+    email: 'hola@cafeplaca.ad',
+    website: 'https://cafeplaca.ad',
+    address: 'Plaça Guillemó, 6, Andorra la Vella',
+    parish: 'ANDORRA_LA_VELLA',
+    latitude: 42.5072,
+    longitude: 1.5238,
+    isActive: true,
+    isFeatured: false,
+    coverImage: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1464306076886-debca5e8a6b0?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.6,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i, openTime: '08:00', closeTime: '20:00', isClosed: false })),
+    zones: [{ name: 'Saló', tables: [
+      { label: 'C1', minCovers: 1, maxCovers: 2 }, { label: 'C2', minCovers: 2, maxCovers: 4 }, { label: 'C3', minCovers: 2, maxCovers: 4 },
+    ]}],
+    services: [{ name: 'Tot el dia', startTime: '08:00', endTime: '20:00', slotInterval: 30, turnDuration: 45, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] }],
+    menu: [
+      { name: 'Esmorzar', sortOrder: 0, items: [
+        { name: 'Cappuccino & croissant', description: 'Mantega francesa', price: 5.5, image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&h=400&fit=crop', allergens: ['gluten', 'dairy'], isPopular: true },
+        { name: 'Tosta d’alvocat', description: 'Ou poché i llavors', price: 9, image: 'https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?w=600&h=400&fit=crop', allergens: ['gluten', 'eggs'] },
+      ]},
+      { name: 'Pastissos', sortOrder: 1, items: [
+        { name: 'Pastís de xocolata', description: 'Ganache belga', price: 6.5, image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=400&fit=crop', allergens: ['gluten', 'dairy', 'eggs'], isPopular: true },
+      ]},
+    ],
+    offers: [{ title: 'Cafè + pastís', description: 'Tot el dia', type: 'SPECIAL_MENU', value: 7.5 }],
+  },
+  {
+    name: 'Steakhouse Nord',
+    slug: 'steakhouse-nord',
+    description: 'Vedella nacional a la graella i cocktails clàssics en ambient urbà.',
+    cuisineType: ['steakhouse', 'burgers'],
+    priceRange: 3,
+    phone: '+376 891 004',
+    email: 'reserva@steakhousenord.ad',
+    website: 'https://steakhousenord.ad',
+    address: 'Carrer del Pas de la Casa, 101, Encamp',
+    parish: 'ENCAMP',
+    latitude: 42.5369,
+    longitude: 1.5837,
+    isActive: true,
+    isFeatured: true,
+    coverImage: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1558030006-450675393462?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.4,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i, openTime: '13:00', closeTime: i >= 5 ? '00:00' : '23:00', isClosed: i === 1 })),
+    zones: [{ name: 'Graella', tables: [
+      { label: 'G1', minCovers: 2, maxCovers: 4 }, { label: 'G2', minCovers: 2, maxCovers: 6 }, { label: 'G3', minCovers: 4, maxCovers: 8 },
+    ]}],
+    services: [
+      { name: 'Dinar', startTime: '13:00', endTime: '16:00', slotInterval: 30, turnDuration: 90, daysOfWeek: [0, 2, 3, 4, 5, 6] },
+      { name: 'Sopar', startTime: '20:00', endTime: '23:30', slotInterval: 30, turnDuration: 120, daysOfWeek: [0, 2, 3, 4, 5, 6] },
+    ],
+    menu: [
+      { name: 'Graella', sortOrder: 0, items: [
+        { name: 'Entrecot Black Angus', description: '400g amb guarnició', price: 38, image: 'https://images.unsplash.com/photo-1558030006-450675393462?w=600&h=400&fit=crop', isPopular: true },
+        { name: 'Chuletón dry-aged', description: '800g per compartir', price: 72, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&h=400&fit=crop' },
+      ]},
+      { name: 'Entrants', sortOrder: 1, items: [
+        { name: 'Tartar de vedella', description: 'Ou de guatlla i mostassa', price: 17, image: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=600&h=400&fit=crop', allergens: ['eggs'] },
+      ]},
+    ],
+    offers: [{ title: '-15% migdia', type: 'PERCENTAGE', value: 15, daysOfWeek: [2, 3, 4, 5], startTime: '13:00', endTime: '16:00' }],
+  },
+  {
+    name: 'Sushi Go',
+    slug: 'sushi-go',
+    description: 'Conveyor belt, sashimi del dia i bowls poke ràpids.',
+    cuisineType: ['sushi', 'asian'],
+    priceRange: 2,
+    phone: '+376 891 005',
+    email: 'hello@sushigo.ad',
+    website: 'https://sushigo.ad',
+    address: 'Avinguda Fiter i Rossell, 14, Escaldes-Engordany',
+    parish: 'ESCALDES_ENGORDANY',
+    latitude: 42.5105,
+    longitude: 1.5358,
+    isActive: true,
+    isFeatured: false,
+    coverImage: 'https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1563612116625-3012373fdd40?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.2,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i, openTime: '12:30', closeTime: '22:30', isClosed: false })),
+    zones: [{ name: 'Cinta', tables: [
+      { label: 'SG1', minCovers: 1, maxCovers: 2 }, { label: 'SG2', minCovers: 2, maxCovers: 4 }, { label: 'SG3', minCovers: 2, maxCovers: 4 },
+    ]}],
+    services: [{ name: 'Servei continu', startTime: '12:30', endTime: '22:30', slotInterval: 30, turnDuration: 75, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] }],
+    menu: [
+      { name: 'Combinats', sortOrder: 0, items: [
+        { name: 'Menú 18 peces', description: 'Mix de nigiris i makis', price: 22, image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=600&h=400&fit=crop', allergens: ['fish', 'soy'], isPopular: true },
+        { name: 'Poke salmó', description: 'Arròs, edamame, alvocat', price: 14, image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&h=400&fit=crop', allergens: ['fish', 'soy'] },
+      ]},
+    ],
+    offers: [{ title: '2x1 dimarts', description: 'En bowls poke', type: 'PERCENTAGE', value: 50, daysOfWeek: [2] }],
+  },
+  {
+    name: 'Farm to Table',
+    slug: 'farm-to-table-ordino',
+    description: 'Menú degustació amb verdures de l’hort veí i carns de proximitat.',
+    cuisineType: ['healthy', 'fine_dining'],
+    priceRange: 3,
+    phone: '+376 891 006',
+    email: 'slow@farmtotable.ad',
+    website: 'https://farmtotable.ad',
+    address: 'Camí del Vilar, 3, Ordino',
+    parish: 'ORDINO',
+    latitude: 42.5549,
+    longitude: 1.5318,
+    isActive: true,
+    isFeatured: false,
+    coverImage: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.7,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i, openTime: '13:00', closeTime: '22:00', isClosed: i === 1 || i === 2 })),
+    zones: [{ name: 'Sala', tables: [
+      { label: 'FT1', minCovers: 2, maxCovers: 4 }, { label: 'FT2', minCovers: 2, maxCovers: 4 },
+    ]}],
+    services: [
+      { name: 'Dinar', startTime: '13:00', endTime: '15:30', slotInterval: 30, turnDuration: 120, daysOfWeek: [0, 3, 4, 5, 6] },
+      { name: 'Sopar', startTime: '20:00', endTime: '22:00', slotInterval: 30, turnDuration: 120, daysOfWeek: [0, 3, 4, 5, 6] },
+    ],
+    menu: [
+      { name: 'Menú vegetal', sortOrder: 0, items: [
+        { name: 'Carpaccio de remolatxa', description: 'Formatge de cabra i pistachos', price: 14, image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop', allergens: ['dairy', 'nuts'] },
+        { name: 'Risotto de bolets', description: 'Arròs arborio i parmesà', price: 19, image: 'https://images.unsplash.com/photo-1476124369491-e7dc7127179c?w=600&h=400&fit=crop', allergens: ['dairy'], isPopular: true },
+      ]},
+    ],
+    offers: [{ title: 'Tasting 5 plats', type: 'SPECIAL_MENU', value: 58, daysOfWeek: [5, 6] }],
+  },
+  {
+    name: 'Taberna 472',
+    slug: 'taberna-472',
+    description: 'Vins naturals, conserves gourmet i tapes per compartir fins tard.',
+    cuisineType: ['tapas', 'mediterranean'],
+    priceRange: 2,
+    phone: '+376 891 007',
+    email: 'wine@taberna472.ad',
+    website: 'https://taberna472.ad',
+    address: 'Av. Sant Antoni, 18, La Massana',
+    parish: 'LA_MASSANA',
+    latitude: 42.5448,
+    longitude: 1.5149,
+    isActive: true,
+    isFeatured: false,
+    coverImage: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.4,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i, openTime: i >= 5 ? '18:00' : '13:00', closeTime: i >= 5 ? '01:00' : '23:30', isClosed: false })),
+    zones: [{ name: 'Barra', tables: [
+      { label: 'T4-1', minCovers: 1, maxCovers: 2 }, { label: 'T4-2', minCovers: 2, maxCovers: 4 }, { label: 'T4-3', minCovers: 2, maxCovers: 6 },
+    ]}],
+    services: [
+      { name: 'Vermut', startTime: '13:00', endTime: '16:00', slotInterval: 30, turnDuration: 60, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] },
+      { name: 'Sopar', startTime: '20:00', endTime: '23:30', slotInterval: 30, turnDuration: 90, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] },
+    ],
+    menu: [
+      { name: 'Per compartir', sortOrder: 0, items: [
+        { name: 'Taula de formatges', description: 'Selecció artesana', price: 22, image: 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=600&h=400&fit=crop', allergens: ['dairy'], isPopular: true },
+        { name: 'Anxoves del Cantàbric', description: 'Amb pebrot del piquillo', price: 16, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&h=400&fit=crop', allergens: ['fish'] },
+      ]},
+    ],
+    offers: [{ title: 'Copa + tapa', type: 'SPECIAL_MENU', value: 6.5, daysOfWeek: [4, 5, 6], startTime: '18:00', endTime: '20:00' }],
+  },
+  {
+    name: 'Mont Blanc Grill',
+    slug: 'mont-blanc-grill',
+    description: 'BBQ americà, costelles fumades i ambient familiar a peu de pistes.',
+    cuisineType: ['burgers', 'steakhouse'],
+    priceRange: 2,
+    phone: '+376 891 008',
+    email: 'smoke@montblancgrill.ad',
+    website: 'https://montblancgrill.ad',
+    address: 'Edifici Soldeu Park, Soldeu',
+    parish: 'CANILLO',
+    latitude: 42.5778,
+    longitude: 1.6679,
+    isActive: true,
+    isFeatured: false,
+    coverImage: 'https://images.unsplash.com/photo-1558030006-450675393462?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1558030006-450675393462?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.1,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i, openTime: '12:00', closeTime: '23:00', isClosed: false })),
+    zones: [{ name: 'Sala', tables: [
+      { label: 'MB1', minCovers: 2, maxCovers: 4 }, { label: 'MB2', minCovers: 2, maxCovers: 6 }, { label: 'MB3', minCovers: 4, maxCovers: 8 },
+    ]}],
+    services: [{ name: 'Servei continu', startTime: '12:00', endTime: '23:00', slotInterval: 30, turnDuration: 90, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] }],
+    menu: [
+      { name: 'Fumats', sortOrder: 0, items: [
+        { name: 'Costelles BBQ', description: 'Salsa secreta, coleslaw', price: 21, image: 'https://images.unsplash.com/photo-1558030006-450675393462?w=600&h=400&fit=crop', isPopular: true },
+        { name: 'Brisket fumat', description: '12h de fumat', price: 24, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&h=400&fit=crop' },
+      ]},
+    ],
+    offers: [{ title: 'Menú esquiador', description: 'Principal + beguda + postre', type: 'SPECIAL_MENU', value: 19 }],
+  },
+  {
+    name: 'Dolce Vita Gelato',
+    slug: 'dolce-vita-gelato',
+    description: 'Gelats artesans italians, granissats i crepes ben avinguda Meritxell.',
+    cuisineType: ['healthy', 'mediterranean'],
+    priceRange: 1,
+    phone: '+376 891 009',
+    email: 'ciao@dolcevita.ad',
+    website: 'https://dolcevita.ad',
+    address: 'Avinguda Meritxell, 52, Sant Julià de Lòria',
+    parish: 'SANT_JULIA_DE_LORIA',
+    latitude: 42.4659,
+    longitude: 1.4933,
+    isActive: true,
+    isFeatured: false,
+    coverImage: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=800&h=600&fit=crop',
+    images: [
+      'https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1488900128323-221039fa4206?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1508737027454-e6454ef45afd?w=800&h=600&fit=crop',
+    ],
+    avgRating: 4.8,
+    reviewCount: 0,
+    hours: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i, openTime: '11:00', closeTime: '23:00', isClosed: false })),
+    zones: [{ name: 'Gelateria', tables: [
+      { label: 'DV1', minCovers: 1, maxCovers: 2 }, { label: 'DV2', minCovers: 2, maxCovers: 4 }, { label: 'DV3', minCovers: 2, maxCovers: 4 },
+    ]}],
+    services: [{ name: 'Obert', startTime: '11:00', endTime: '23:00', slotInterval: 15, turnDuration: 45, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] }],
+    menu: [
+      { name: 'Gelats', sortOrder: 0, items: [
+        { name: 'Coppa pistacchio', description: 'Gelat DOP Bronte', price: 7.5, image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=600&h=400&fit=crop', allergens: ['dairy', 'nuts'], isPopular: true },
+        { name: 'Stracciatella', description: 'Xocolata belga', price: 6, image: 'https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?w=600&h=400&fit=crop', allergens: ['dairy'] },
+      ]},
+      { name: 'Crepes', sortOrder: 1, items: [
+        { name: 'Crepe Nutella', description: 'Amb fruita fresca', price: 8, image: 'https://images.unsplash.com/photo-1488900128323-221039fa4206?w=600&h=400&fit=crop', allergens: ['gluten', 'dairy', 'nuts'] },
+      ]},
+    ],
+    offers: [{ title: '2 boles + cafè', type: 'SPECIAL_MENU', value: 8.5 }],
+  },
 ];
+
+/** Propietari demo principal (panell restaurant): gestiona Borda Jovell */
+const DEMO_OWNER_EMAIL = 'restaurante@taula.ad';
+const DEMO_OWNER_RESTAURANT_SLUG = 'borda-jovell';
+
+const REVIEWER_COUNT = 42;
+
+const REVIEW_COMMENTS_CA = [
+  'Excel·lent servei i menjar deliciós. Tornarem segur!',
+  'Bon ambient familiar. Les reserves van fluides.',
+  'Carta variada i producte fresc. Recomanable.',
+  'Un pèl lent el servei però la qualitat compensa.',
+  'Perfecte per una ocasió especial.',
+  'Bon rapport qualitat-preu per Andorra.',
+  'Terrassa molt agradable a l’estiu.',
+  'El personal és molt atent.',
+  'Es nota la cura pel detall.',
+  'Les postres eren espectaculars.',
+  'Ideal per anar amb nens.',
+  'El vi de la casa va maridar molt bé.',
+  'Tornaria només pels entrants.',
+  'Una mica sorollós però normal per l’hora punta.',
+  'Cuina honesta i sabors clars.',
+  'La carn estava al punt.',
+  'Bon sushi per ser a la muntanya.',
+  'Esperàvem més però està bé.',
+  'Genial per sopar entre setmana.',
+  'Repetirem la fondue sense dubte.',
+  'Brunch abundant i cafè bo.',
+  'El poke bowl era fresquíssim.',
+  'Decoració acollidora.',
+  'Bon punt de cocció del peix.',
+  'Hi ha opcions vegetarianes clares.',
+];
+
+const OWNER_REPLIES_CA = [
+  'Moltes gràcies pel teu comentari, ens alegra molt!',
+  'Gràcies per venir; esperem veure-us aviat.',
+  'Apreciem la teva opinió i treballem cada dia per millorar.',
+  'Ens fa molta il·lusió que hagis gaudit de l’experiència.',
+];
+
+function seededRandom(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i) || 0;
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), h | 1);
+    h ^= h + Math.imul(h ^ (h >>> 7), h | 61);
+    return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleWithSeed<T>(arr: T[], rnd: () => number): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Rating amb pes cap a 4–5 estrelles */
+function pickRating(rnd: () => number): number {
+  const r = rnd();
+  let base: number;
+  if (r < 0.08) base = 3 + rnd();
+  else if (r < 0.22) base = 3.5 + rnd() * 0.5;
+  else if (r < 0.55) base = 4 + rnd() * 0.5;
+  else base = 4.5 + rnd() * 0.5;
+  return Math.round(base * 2) / 2;
+}
 
 const main = async () => {
   console.log('Seeding database...\n');
+
+  const seededRestaurantIds: string[] = [];
 
   for (const restaurantData of RESTAURANTS_SEED) {
     const { hours, zones, services, menu, offers, ...data } = restaurantData;
@@ -642,6 +1076,8 @@ const main = async () => {
       },
       create: data,
     });
+
+    seededRestaurantIds.push(restaurant.id);
 
     for (const hour of hours) {
       await prisma.openingHours.upsert({
@@ -699,15 +1135,64 @@ const main = async () => {
       }
     }
 
-    const ownerEmail = `owner@${data.slug}.taula.ad`;
-    await prisma.restaurantOwner.upsert({
+    const ownerEmail =
+      data.slug === DEMO_OWNER_RESTAURANT_SLUG
+        ? DEMO_OWNER_EMAIL
+        : `owner@${data.slug}.taula.ad`;
+    const ownerUser = await prisma.user.upsert({
       where: { email: ownerEmail },
+      update: {
+        name:
+          data.slug === DEMO_OWNER_RESTAURANT_SLUG
+            ? 'Propietari demo · Borda Jovell'
+            : `Owner ${data.name}`,
+        avatar:
+          data.slug === DEMO_OWNER_RESTAURANT_SLUG
+            ? 'https://i.pravatar.cc/256?u=restaurante@taula.ad'
+            : undefined,
+      },
+      create: {
+        email: ownerEmail,
+        name:
+          data.slug === DEMO_OWNER_RESTAURANT_SLUG
+            ? 'Propietari demo · Borda Jovell'
+            : `Owner ${data.name}`,
+        avatar:
+          data.slug === DEMO_OWNER_RESTAURANT_SLUG
+            ? 'https://i.pravatar.cc/256?u=restaurante@taula.ad'
+            : null,
+        passwordHash: await bcrypt.hash('password123', 12),
+        authProvider: 'email',
+        preferredLang: 'ca',
+      },
+    });
+
+    await prisma.restaurantOwner.upsert({
+      where: {
+        userId_restaurantId: { userId: ownerUser.id, restaurantId: restaurant.id },
+      },
+      update: {},
+      create: {
+        userId: ownerUser.id,
+        restaurantId: restaurant.id,
+        role: 'OWNER',
+      },
+    });
+
+    await prisma.notificationPreference.upsert({
+      where: { userId: ownerUser.id },
+      update: {},
+      create: { userId: ownerUser.id },
+    });
+
+    await prisma.subscription.upsert({
+      where: { restaurantId: restaurant.id },
       update: {},
       create: {
         restaurantId: restaurant.id,
-        email: ownerEmail,
-        name: `Owner ${data.name}`,
-        passwordHash: await bcrypt.hash('password123', 12),
+        plan: 'RESERVATIONS',
+        status: 'ADMIN_GRANT',
+        adminGranted: true,
       },
     });
 
@@ -764,21 +1249,140 @@ const main = async () => {
     console.log(`  OK ${restaurant.name} (${data.parish})`);
   }
 
-  await prisma.user.upsert({
+  console.log('\n  Creando usuarios reseña y reseñas…');
+
+  await prisma.review.deleteMany({
+    where: {
+      user: {
+        email: { startsWith: 'reviewer-', endsWith: '@seed.taula.ad' },
+      },
+    },
+  });
+
+  const reviewerPwdHash = await bcrypt.hash('seed-reviewers', 12);
+  for (let i = 1; i <= REVIEWER_COUNT; i++) {
+    const email = `reviewer-${String(i).padStart(2, '0')}@seed.taula.ad`;
+    await prisma.user.upsert({
+      where: { email },
+      update: { name: `Client demo ${i}` },
+      create: {
+        email,
+        name: `Client demo ${i}`,
+        passwordHash: reviewerPwdHash,
+        authProvider: 'email',
+        preferredLang: 'ca',
+        avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(email)}`,
+      },
+    });
+  }
+
+  const reviewerRows = await prisma.user.findMany({
+    where: { email: { startsWith: 'reviewer-', endsWith: '@seed.taula.ad' } },
+    select: { id: true },
+    orderBy: { email: 'asc' },
+  });
+  const reviewerIds = reviewerRows.map((u) => u.id);
+
+  const restaurantsForReviews = await prisma.restaurant.findMany({
+    where: { id: { in: seededRestaurantIds } },
+    select: { id: true, slug: true, isFeatured: true },
+  });
+
+  for (const r of restaurantsForReviews) {
+    const rnd = seededRandom(`reviews:${r.slug}`);
+    const nReviews = 12 + Math.floor(rnd() * 17);
+    const pickedIds = shuffleWithSeed(reviewerIds, rnd).slice(0, Math.min(nReviews, reviewerIds.length));
+    const baseDays = Math.floor(rnd() * 520);
+
+    for (let i = 0; i < pickedIds.length; i++) {
+      const rating = pickRating(rnd);
+      const comment = REVIEW_COMMENTS_CA[Math.floor(rnd() * REVIEW_COMMENTS_CA.length)];
+      const createdAt = new Date(Date.now() - (baseDays + i * 4) * 86_400_000);
+      const ownerReply =
+        r.isFeatured && rating >= 4 && rnd() < 0.38
+          ? OWNER_REPLIES_CA[Math.floor(rnd() * OWNER_REPLIES_CA.length)]
+          : null;
+
+      await prisma.review.upsert({
+        where: {
+          userId_restaurantId: { userId: pickedIds[i], restaurantId: r.id },
+        },
+        update: { rating, comment, ownerReply, createdAt },
+        create: {
+          userId: pickedIds[i],
+          restaurantId: r.id,
+          rating,
+          comment,
+          ownerReply,
+          createdAt,
+        },
+      });
+    }
+  }
+
+  const testUser = await prisma.user.upsert({
     where: { email: 'test@taula.ad' },
-    update: {},
+    update: {
+      name: 'Usuario Test',
+      avatar: 'https://i.pravatar.cc/256?u=test@taula.ad',
+    },
     create: {
       email: 'test@taula.ad',
       name: 'Usuario Test',
+      avatar: 'https://i.pravatar.cc/256?u=test@taula.ad',
       passwordHash: await bcrypt.hash('password123', 12),
       authProvider: 'email',
       preferredLang: 'ca',
     },
   });
 
+  const borda = await prisma.restaurant.findUnique({ where: { slug: DEMO_OWNER_RESTAURANT_SLUG } });
+  if (borda) {
+    await prisma.review.upsert({
+      where: {
+        userId_restaurantId: { userId: testUser.id, restaurantId: borda.id },
+      },
+      update: {
+        rating: 5,
+        comment: 'Experiència immillorable; la brasa i el servei excel·lents.',
+      },
+      create: {
+        userId: testUser.id,
+        restaurantId: borda.id,
+        rating: 5,
+        comment: 'Experiència immillorable; la brasa i el servei excel·lents.',
+      },
+    });
+  }
+
+  for (const id of seededRestaurantIds) {
+    const agg = await prisma.review.aggregate({
+      where: { restaurantId: id },
+      _avg: { rating: true },
+      _count: true,
+    });
+    await prisma.restaurant.update({
+      where: { id },
+      data: {
+        avgRating: Math.round((agg._avg.rating ?? 0) * 10) / 10,
+        reviewCount: agg._count,
+      },
+    });
+  }
+
+  await prisma.notificationPreference.upsert({
+    where: { userId: testUser.id },
+    update: {},
+    create: { userId: testUser.id },
+  });
+
   console.log('\n  Seed completado!');
-  console.log('\n  Usuario test: test@taula.ad / password123');
-  console.log('  Panel restaurante: owner@borda-jovell.taula.ad / password123');
+  console.log(`\n  Client (app): ${testUser.email} / password123`);
+  console.log(`  Propietari (panell restaurant, ${DEMO_OWNER_RESTAURANT_SLUG}): ${DEMO_OWNER_EMAIL} / password123`);
+  console.log('  Altres locals: owner@<slug>.taula.ad / password123');
+  console.log(
+    `  ${RESTAURANTS_SEED.length} restaurantes · ~${REVIEWER_COUNT} usuarios reseña · respuestas del propietario en locales destacados`,
+  );
 };
 
 main()

@@ -25,6 +25,7 @@ import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useLocation } from '@/hooks/useLocation';
 import { api } from '@/services/api';
 import LocationSheet from '@/components/LocationSheet';
+import NotificationBell from '@/components/NotificationBell';
 
 const { width: SW } = Dimensions.get('window');
 const FEATURED_W = SW - 40;
@@ -53,6 +54,9 @@ interface Restaurant {
   isOpen?: boolean;
   offer?: string | null;
   activeOffer?: ActiveOffer | null;
+  featured?: boolean;
+  plan?: 'RESERVATIONS' | 'LISTING_BASIC' | 'LISTING_FEATURED' | null;
+  externalReservationUrl?: string | null;
 }
 
 interface RestaurantsResponse {
@@ -93,6 +97,15 @@ function OfferBadge({ text }: { text: string }) {
     <View style={h.offerBadge}>
       <Ionicons name="pricetag" size={10} color={Colors.white} />
       <Text style={h.offerTxt}>{text}</Text>
+    </View>
+  );
+}
+
+function FeaturedBadge() {
+  return (
+    <View style={h.featuredBadge}>
+      <Ionicons name="star" size={10} color={Colors.textInverse} />
+      <Text style={h.featuredBadgeTxt}>Destacado</Text>
     </View>
   );
 }
@@ -150,12 +163,11 @@ function FeaturedCard({ item, index }: { item: Restaurant; index: number }) {
         <HeartBtn id={item.id} />
       </View>
 
-      {/* Offer badge top-left */}
-      {item.offer && (
-        <View style={h.featuredTopLeft}>
-          <OfferBadge text={item.offer} />
-        </View>
-      )}
+      {/* Offer + featured badges top-left */}
+      <View style={h.featuredTopLeft}>
+        {item.featured ? <FeaturedBadge /> : null}
+        {item.offer ? <OfferBadge text={item.offer} /> : null}
+      </View>
 
       {/* Distance pill */}
       {item.distance != null && (
@@ -209,12 +221,11 @@ function GridCard({ item }: { item: Restaurant }) {
         )}
         <LinearGradient colors={['rgba(0,0,0,0.1)', 'transparent', 'rgba(0,0,0,0.55)']} locations={[0, 0.35, 1]} style={h.gridGrad} />
 
-        {/* Top: offer + heart */}
-        {item.offer && (
-          <View style={h.gridOfferWrap}>
-            <OfferBadge text={item.offer} />
-          </View>
-        )}
+        {/* Top: offer/featured + heart */}
+        <View style={h.gridOfferWrap}>
+          {item.featured ? <FeaturedBadge /> : null}
+          {item.offer ? <OfferBadge text={item.offer} /> : null}
+        </View>
         <View style={h.gridHeartWrap}>
           <HeartBtn id={item.id} />
         </View>
@@ -267,12 +278,11 @@ function ListCard({ item }: { item: Restaurant }) {
         )}
         <LinearGradient colors={['rgba(0,0,0,0.15)', 'transparent', 'rgba(0,0,0,0.5)']} locations={[0, 0.4, 1]} style={h.listGrad} />
 
-        {/* Top-left: offer */}
-        {item.offer && (
-          <View style={h.listOfferWrap}>
-            <OfferBadge text={item.offer} />
-          </View>
-        )}
+        {/* Top-left: featured + offer */}
+        <View style={h.listOfferWrap}>
+          {item.featured ? <FeaturedBadge /> : null}
+          {item.offer ? <OfferBadge text={item.offer} /> : null}
+        </View>
 
         {/* Top-right: heart */}
         <View style={h.listHeartWrap}>
@@ -351,6 +361,7 @@ export default function HomeScreen() {
   }));
   const nearby = all.filter((r) => r.distance != null && r.distance < 5).slice(0, 6);
   const topRated = [...all].sort((a, b) => b.avgRating - a.avgRating).slice(0, 6);
+  const featuredList = all.filter((r) => r.featured).slice(0, 8);
 
   const renderHeader = useCallback(
     () => (
@@ -367,6 +378,7 @@ export default function HomeScreen() {
             <Text style={h.locHeaderCity} numberOfLines={1}>{cityName}</Text>
             <Ionicons name="chevron-down" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
+          {user && <NotificationBell scope="user" />}
           <TouchableOpacity
             onPress={() => (user ? router.push('/(tabs)/profile') : router.push('/(auth)/login'))}
             activeOpacity={0.7}
@@ -412,6 +424,28 @@ export default function HomeScreen() {
             );
           })}
         </ScrollView>
+
+        {/* ─── DESTACADOS ─── */}
+        {featuredList.length > 0 && (
+          <View style={h.sectionWrap}>
+            <View style={h.sectionRow}>
+              <Text style={h.sectionTitle}>Destacados</Text>
+              <TouchableOpacity onPress={() => router.push('/list?featured=1')}>
+                <Text style={h.seeAll}>{t('common.see_all')} →</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              horizontal
+              data={featuredList}
+              keyExtractor={(r) => r.id + '-featured'}
+              renderItem={({ item, index }) => <FeaturedCard item={item} index={index} />}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingRight: 20 }}
+              snapToInterval={FEATURED_W + 12}
+              decelerationRate="fast"
+            />
+          </View>
+        )}
 
         {/* ─── POPULAR NEAR YOU ─── */}
         {nearby.length > 0 && (
@@ -462,7 +496,7 @@ export default function HomeScreen() {
         )}
       </View>
     ),
-    [t, nearby, topRated, all.length, cuisine, user, cityName, isGps],
+    [t, nearby, topRated, featuredList, all.length, cuisine, user, cityName, isGps],
   );
 
   if (isLoading) {
@@ -701,6 +735,21 @@ const h = StyleSheet.create({
     color: Colors.white,
     textTransform: 'uppercase',
   },
+  featuredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  featuredBadgeTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.textInverse,
+    textTransform: 'uppercase',
+  },
   ratingPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -778,6 +827,7 @@ const h = StyleSheet.create({
     position: 'absolute',
     top: 12,
     left: 12,
+    gap: 6,
   },
   featuredDistPill: {
     position: 'absolute',
@@ -874,6 +924,7 @@ const h = StyleSheet.create({
     position: 'absolute',
     top: 7,
     left: 7,
+    gap: 4,
   },
   gridImgBottom: {
     position: 'absolute',
@@ -979,6 +1030,7 @@ const h = StyleSheet.create({
     position: 'absolute',
     top: 10,
     left: 10,
+    gap: 6,
   },
   listHeartWrap: {
     position: 'absolute',

@@ -31,13 +31,21 @@ export default function RestaurantCardV({ restaurant }: RestaurantCardVProps) {
       style={styles.card}
       onPress={() => router.push(`/restaurant/${restaurant.slug}`)}
     >
-      <Image
-        source={{ uri: restaurant.imageUrl ?? undefined }}
-        style={styles.image}
-        contentFit="cover"
-        placeholder={{ blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH' }}
-        transition={200}
-      />
+      <View style={styles.imgWrap}>
+        <Image
+          source={{ uri: restaurant.imageUrl ?? undefined }}
+          style={styles.image}
+          contentFit="cover"
+          placeholder={{ blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH' }}
+          transition={200}
+        />
+        {restaurant.featured && (
+          <View style={styles.featuredBadge}>
+            <Ionicons name="star" size={9} color={Colors.textInverse} />
+            <Text style={styles.featuredBadgeText}>Destacado</Text>
+          </View>
+        )}
+      </View>
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
           {restaurant.name}
@@ -87,10 +95,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  imgWrap: { position: 'relative' },
   image: {
     width: 100,
     height: 100,
     backgroundColor: Colors.surfaceSecondary,
+  },
+  featuredBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  featuredBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: Colors.textInverse,
+    textTransform: 'uppercase',
   },
   info: {
     flex: 1,

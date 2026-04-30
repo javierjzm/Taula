@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { PARISHES, CUISINE_TYPES, getCuisineLabel } from '@/constants/andorra';
 import { api } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
 
 const PRICE_OPTIONS = [1, 2, 3, 4];
 
@@ -43,6 +44,7 @@ interface FormErrors {
 export default function RegisterRestaurantScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const ownerships = useAuthStore((s) => s.ownerships);
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState<FormData>({
@@ -123,7 +125,9 @@ export default function RegisterRestaurantScreen() {
       router.replace('/register-restaurant-success');
     } catch (err: any) {
       const msg = err?.message ?? '';
-      if (msg.includes('Unique constraint') || msg.includes('already exists')) {
+      if (err?.code === 'RESTAURANT_OWNER_LIMIT') {
+        Alert.alert(t('common.error'), msg);
+      } else if (msg.includes('Unique constraint') || msg.includes('already exists')) {
         Alert.alert(t('common.error'), t('register_restaurant.error_duplicate'));
       } else {
         Alert.alert(t('common.error'), t('register_restaurant.error_generic'));
@@ -134,6 +138,40 @@ export default function RegisterRestaurantScreen() {
   };
 
   const rr = 'register_restaurant';
+
+  if (ownerships.length > 0) {
+    return (
+      <View style={s.root}>
+        <Stack.Screen options={{ headerShown: false }} />
+
+        <View style={[s.header, { paddingTop: insets.top + 4 }]}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()} hitSlop={12}>
+            <Ionicons name="chevron-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>{t(`${rr}.title`)}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={s.blockedWrap}>
+          <View style={s.blockedIcon}>
+            <Ionicons name="storefront" size={34} color={Colors.primary} />
+          </View>
+          <Text style={s.blockedTitle}>Ya tienes un restaurante</Text>
+          <Text style={s.blockedText}>
+            Cada cuenta solo puede gestionar un restaurante. Usa el selector de modo desde tu
+            perfil para entrar al panel.
+          </Text>
+          <TouchableOpacity
+            style={s.secondaryBtn}
+            onPress={() => router.replace('/(tabs)/profile')}
+            activeOpacity={0.8}
+          >
+            <Text style={s.secondaryBtnText}>Volver al perfil</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={s.root}>
@@ -466,4 +504,40 @@ const s = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.6 },
   submitTxt: { color: Colors.textInverse, fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+  blockedWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    gap: 14,
+  },
+  blockedIcon: {
+    width: 76,
+    height: 76,
+    borderRadius: 24,
+    backgroundColor: Colors.primaryGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  blockedTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  blockedText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  secondaryBtn: {
+    marginTop: 10,
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+  },
+  secondaryBtnText: { color: Colors.textInverse, fontWeight: '800', fontSize: 15 },
 });

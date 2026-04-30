@@ -1,9 +1,10 @@
 import jwt from 'jsonwebtoken';
+import type { Secret, SignOptions } from 'jsonwebtoken';
 
-const ACCESS_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me-32-chars-min';
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-change-me-32-chars';
-const ACCESS_EXPIRES = process.env.JWT_EXPIRES_IN || '15m';
-const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
+const ACCESS_SECRET: Secret = process.env.JWT_SECRET || 'dev-secret-change-me-32-chars-min';
+const REFRESH_SECRET: Secret = process.env.JWT_REFRESH_SECRET || 'dev-refresh-change-me-32-chars';
+const ACCESS_EXPIRES = (process.env.JWT_EXPIRES_IN || '15m') as SignOptions['expiresIn'];
+const REFRESH_EXPIRES = (process.env.JWT_REFRESH_EXPIRES_IN || '30d') as SignOptions['expiresIn'];
 
 export interface JwtPayload {
   sub: string;

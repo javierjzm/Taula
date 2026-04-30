@@ -1,15 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 import { StripeService } from './stripe.service';
 import { EmailService } from './email.service';
+import { NotificationService } from './notification.service';
 
 export class NoShowCronService {
   private stripeService: StripeService;
   private emailService: EmailService;
+  private notificationService: NotificationService;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private prisma: PrismaClient) {
     this.stripeService = new StripeService(prisma);
     this.emailService = new EmailService(prisma);
+    this.notificationService = new NotificationService(prisma);
   }
 
   start(intervalMs = 5 * 60 * 1000) {
@@ -70,8 +73,9 @@ export class NoShowCronService {
 
           if (this.stripeService.isAvailable()) {
             const chargeResult = await this.stripeService.chargeNoShow(res.id);
+            const amount = restaurant.noShowFeePerPerson * res.partySize;
             if (chargeResult.success) {
-              console.log(`[NoShowCron] Charged no-show for ${res.code}: ${restaurant.noShowFeePerPerson * res.partySize}€`);
+              console.log(`[NoShowCron] Charged no-show for ${res.code}: ${amount}€`);
 
               this.emailService.queueEmail({
                 type: 'NoShowChargeEmail',
@@ -79,7 +83,7 @@ export class NoShowCronService {
                 userName: res.user.name,
                 restaurantName: restaurant.name,
                 reservationCode: res.code,
-                amount: restaurant.noShowFeePerPerson * res.partySize,
+                amount,
                 date: res.date.toISOString().split('T')[0],
                 time: res.time,
               });
@@ -91,13 +95,39 @@ export class NoShowCronService {
                   restaurantName: restaurant.name,
                   reservationCode: res.code,
                   guestName: res.user.name,
-                  amount: restaurant.noShowFeePerPerson * res.partySize,
+                  amount,
                   date: res.date.toISOString().split('T')[0],
                   time: res.time,
                 });
               }
+
+              await this.notificationService
+                .notifyUser(res.user.id, {
+                  title: 'Cargo por no presentarse',
+                  body: `Se cobró ${amount}€ por la reserva en ${restaurant.name}.`,
+                  type: 'noshow_charged',
+                  data: { reservationId: res.id },
+                })
+                .catch(() => {});
+
+              await this.notificationService
+                .notifyRestaurant(restaurant.id, {
+                  title: 'Cargo por no-show realizado',
+                  body: `${amount}€ cobrados a ${res.user.name} (${res.code}).`,
+                  type: 'noshow_charged',
+                  data: { reservationId: res.id, deepLink: '/(restaurant)/agenda' },
+                })
+                .catch(() => {});
             } else {
               console.error(`[NoShowCron] Charge failed for ${res.code}:`, chargeResult.error);
+              await this.notificationService
+                .notifyRestaurant(restaurant.id, {
+                  title: 'Fallo al cobrar no-show',
+                  body: `No se pudo cobrar la fianza de ${res.user.name} (${res.code}).`,
+                  type: 'noshow_charge_failed',
+                  data: { reservationId: res.id, deepLink: '/(restaurant)/agenda' },
+                })
+                .catch(() => {});
             }
           } else {
             console.log(`[NoShowCron] Stripe not available, skipping charge for ${res.code}`);

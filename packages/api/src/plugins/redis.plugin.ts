@@ -10,7 +10,6 @@ declare module 'fastify' {
 export const redisPlugin = fp(async (fastify) => {
   const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
     maxRetriesPerRequest: 3,
-    retryDelayOnFailover: 1000,
   });
 
   redis.on('error', (err) => fastify.log.error({ err }, 'Redis error'));

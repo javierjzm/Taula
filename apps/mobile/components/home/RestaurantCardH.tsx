@@ -18,6 +18,8 @@ export interface Restaurant {
   parish: string;
   priceRange?: number;
   distance?: number;
+  featured?: boolean;
+  plan?: 'RESERVATIONS' | 'LISTING_BASIC' | 'LISTING_FEATURED' | null;
 }
 
 interface RestaurantCardHProps {
@@ -45,6 +47,12 @@ export default function RestaurantCardH({ restaurant }: RestaurantCardHProps) {
           <View style={styles.ratingBadge}>
             <Ionicons name="star" size={11} color={Colors.star} />
             <Text style={styles.ratingBadgeText}>{restaurant.rating.toFixed(1)}</Text>
+          </View>
+        )}
+        {restaurant.featured && (
+          <View style={styles.featuredBadge}>
+            <Ionicons name="star" size={10} color={Colors.textInverse} />
+            <Text style={styles.featuredBadgeText}>Destacado</Text>
           </View>
         )}
       </View>
@@ -115,6 +123,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: Colors.white,
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  featuredBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.textInverse,
+    textTransform: 'uppercase',
   },
   body: {
     padding: 12,

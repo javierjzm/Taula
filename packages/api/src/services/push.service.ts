@@ -39,6 +39,11 @@ export const sendPushNotification = async (data: {
   body: string;
   data?: Record<string, string>;
 }) => {
+  if (isExpoPushToken(data.pushToken)) {
+    await sendExpoPushNotification(data);
+    return;
+  }
+
   if (!firebaseReady) {
     return;
   }
@@ -47,7 +52,7 @@ export const sendPushNotification = async (data: {
       token: data.pushToken,
       notification: { title: data.title, body: data.body },
       data: data.data,
-      android: { priority: 'high', notification: { sound: 'default' } },
+      android: { priority: 'high', notification: { channelId: 'default', sound: 'default' } },
       apns: { payload: { aps: { sound: 'default', badge: 1 } } },
     });
   } catch (err) {
@@ -58,3 +63,44 @@ export const sendPushNotification = async (data: {
     }
   }
 };
+
+function isExpoPushToken(token: string): boolean {
+  return /^ExponentPushToken\[.+\]$/.test(token) || /^ExpoPushToken\[.+\]$/.test(token);
+}
+
+async function sendExpoPushNotification(data: {
+  pushToken: string;
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+}) {
+  const res = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Accept-Encoding': 'gzip, deflate',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      to: data.pushToken,
+      title: data.title,
+      body: data.body,
+      data: data.data,
+      sound: 'default',
+      priority: 'high',
+      channelId: 'default',
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Expo push failed with status ${res.status}`);
+  }
+
+  const payload = (await res.json()) as {
+    data?: { status?: string; message?: string; details?: { error?: string } };
+  };
+  const error = payload.data?.details?.error;
+  if (payload.data?.status === 'error' && error !== 'DeviceNotRegistered') {
+    throw new Error(payload.data.message ?? `Expo push error: ${error ?? 'unknown'}`);
+  }
+}

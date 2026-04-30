@@ -82,6 +82,13 @@ export default function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 lg:px-8">
+          <p className="text-xs lg:text-sm text-amber-800">
+            <span className="font-semibold">Esta web está en proceso de retirada.</span>{' '}
+            La nueva experiencia está en la <span className="font-semibold">app móvil de Taula</span>{' '}
+            (modo restaurante). Descárgala para gestionar reservas, plan, notificaciones y mucho más.
+          </p>
+        </div>
         <header className="flex h-16 items-center gap-4 border-b bg-white px-4 lg:px-8 shadow-sm">
           <button
             onClick={() => setSidebarOpen(true)}

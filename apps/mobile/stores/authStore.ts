@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api, setTokens, clearTokens } from '../services/api';
 import { storage } from '../services/storage';
+import type { OwnershipSummary } from '@taula/shared';
 
 interface User {
   id: string;
@@ -13,6 +14,7 @@ interface User {
 
 interface AuthState {
   user: User | null;
+  ownerships: OwnershipSummary[];
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -21,10 +23,21 @@ interface AuthState {
   loginWithApple: (identityToken: string, user?: any) => Promise<void>;
   logout: () => Promise<void>;
   loadSession: () => Promise<void>;
+  refreshOwnerships: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+async function loadOwnerships(): Promise<OwnershipSummary[]> {
+  try {
+    const { data } = await api<{ data: OwnershipSummary[] }>('/me/ownerships');
+    return data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  ownerships: [],
   isAuthenticated: false,
   isLoading: true,
 
@@ -35,7 +48,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
     await setTokens(tokens.accessToken, tokens.refreshToken);
     const { data: user } = await api<{ data: User }>('/me');
-    set({ user, isAuthenticated: true });
+    const ownerships = await loadOwnerships();
+    set({ user, ownerships, isAuthenticated: true });
   },
 
   register: async (data) => {
@@ -45,7 +59,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
     await setTokens(tokens.accessToken, tokens.refreshToken);
     const { data: user } = await api<{ data: User }>('/me');
-    set({ user, isAuthenticated: true });
+    set({ user, ownerships: [], isAuthenticated: true });
   },
 
   loginWithGoogle: async (idToken) => {
@@ -55,7 +69,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
     await setTokens(tokens.accessToken, tokens.refreshToken);
     const { data: user } = await api<{ data: User }>('/me');
-    set({ user, isAuthenticated: true });
+    const ownerships = await loadOwnerships();
+    set({ user, ownerships, isAuthenticated: true });
   },
 
   loginWithApple: async (identityToken, user) => {
@@ -65,12 +80,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
     await setTokens(tokens.accessToken, tokens.refreshToken);
     const { data: userData } = await api<{ data: User }>('/me');
-    set({ user: userData, isAuthenticated: true });
+    const ownerships = await loadOwnerships();
+    set({ user: userData, ownerships, isAuthenticated: true });
   },
 
   logout: async () => {
     await clearTokens();
-    set({ user: null, isAuthenticated: false });
+    set({ user: null, ownerships: [], isAuthenticated: false });
   },
 
   loadSession: async () => {
@@ -81,10 +97,17 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
       const { data: user } = await api<{ data: User }>('/me');
-      set({ user, isAuthenticated: true, isLoading: false });
+      const ownerships = await loadOwnerships();
+      set({ user, ownerships, isAuthenticated: true, isLoading: false });
     } catch {
       await clearTokens();
       set({ isLoading: false });
     }
+  },
+
+  refreshOwnerships: async () => {
+    if (!get().isAuthenticated) return;
+    const ownerships = await loadOwnerships();
+    set({ ownerships });
   },
 }));

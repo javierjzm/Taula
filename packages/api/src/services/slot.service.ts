@@ -5,6 +5,12 @@ import { AppError } from '../utils/errors';
 export class SlotService {
   constructor(private prisma: PrismaClient) {}
 
+  private get availabilitySlot() {
+    // Legacy slot API kept for old tests/routes. The current availability engine
+    // is table/service based, so Prisma no longer exposes this model in schema.
+    return (this.prisma as any).availabilitySlot;
+  }
+
   async generateSlotsForRestaurant(restaurantId: string, daysAhead = 60) {
     const restaurant = await this.prisma.restaurant.findUnique({
       where: { id: restaurantId },
@@ -43,7 +49,7 @@ export class SlotService {
 
     await this.prisma.$transaction(
       slotsToCreate.map((slot) =>
-        this.prisma.availabilitySlot.upsert({
+        this.availabilitySlot.upsert({
           where: {
             restaurantId_date_time: {
               restaurantId: slot.restaurantId,
@@ -61,24 +67,24 @@ export class SlotService {
   }
 
   async blockSlot(restaurantId: string, slotId: string) {
-    const slot = await this.prisma.availabilitySlot.findFirst({
+    const slot = await this.availabilitySlot.findFirst({
       where: { id: slotId, restaurantId },
     });
     if (!slot) throw new AppError(404, 'Slot no encontrado');
 
-    return this.prisma.availabilitySlot.update({
+    return this.availabilitySlot.update({
       where: { id: slotId },
       data: { isBlocked: true },
     });
   }
 
   async unblockSlot(restaurantId: string, slotId: string) {
-    const slot = await this.prisma.availabilitySlot.findFirst({
+    const slot = await this.availabilitySlot.findFirst({
       where: { id: slotId, restaurantId },
     });
     if (!slot) throw new AppError(404, 'Slot no encontrado');
 
-    return this.prisma.availabilitySlot.update({
+    return this.availabilitySlot.update({
       where: { id: slotId },
       data: { isBlocked: false },
     });

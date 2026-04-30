@@ -5,3 +5,5 @@ export * from './types/api.types';
 export * from './schemas/reservation.schema';
 export * from './schemas/auth.schema';
 export * from './schemas/restaurant.schema';
+export * from './schemas/notification.schema';
+export * from './schemas/billing.schema';

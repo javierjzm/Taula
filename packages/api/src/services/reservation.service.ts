@@ -1,8 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import { generateReservationCode } from '../utils/reservationCode';
-import { emailQueue, pushQueue } from '../jobs/queue';
+import { emailQueue } from '../jobs/queue';
 import { AvailabilityService } from './availability.service';
+import { NotificationService } from './notification.service';
 
 function toDTO(r: any) {
   return {
@@ -39,9 +40,11 @@ const RESERVATION_INCLUDE = {
 
 export class ReservationService {
   private availabilityService: AvailabilityService;
+  private notificationService: NotificationService;
 
   constructor(private prisma: PrismaClient) {
     this.availabilityService = new AvailabilityService(prisma);
+    this.notificationService = new NotificationService(prisma);
   }
 
   async create(userId: string, input: {
@@ -143,25 +146,42 @@ export class ReservationService {
       }
     }
 
-    await this.prisma.billingRecord.create({
-      data: {
-        restaurantId: input.restaurantId,
-        reservationId: reservation.id,
-        amount: input.partySize * 1.8,
-        covers: input.partySize,
-        status: 'PENDING',
-      },
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { restaurantId: input.restaurantId },
+      select: { plan: true, status: true },
     });
+    const isReservationsPlan = subscription?.plan === 'RESERVATIONS';
+    if (isReservationsPlan) {
+      await this.prisma.billingRecord.create({
+        data: {
+          restaurantId: input.restaurantId,
+          reservationId: reservation.id,
+          amount: input.partySize * 1,
+          covers: input.partySize,
+          status: 'PENDING',
+        },
+      });
+    }
 
-    await this.prisma.notification.create({
-      data: {
-        userId,
+    await this.notificationService
+      .notifyUser(userId, {
         title: status === 'CONFIRMED' ? 'Reserva confirmada' : 'Reserva pendiente',
         body: `${reservation.restaurant.name} · ${input.date} a las ${input.time} · ${input.partySize} pers.`,
         type: 'reservation',
-        data: { reservationId: reservation.id },
-      },
-    }).catch(() => {});
+        data: { reservationId: reservation.id, deepLink: `/reservation/${reservation.id}` },
+        preferenceKey: 'confirmations',
+      })
+      .catch(() => {});
+
+    await this.notificationService
+      .notifyRestaurant(input.restaurantId, {
+        title: 'Nueva reserva',
+        body: `${reservation.user.name} · ${input.date} a las ${input.time} · ${input.partySize} pers.`,
+        type: 'reservation_new',
+        data: { reservationId: reservation.id, deepLink: '/(restaurant)/agenda' },
+        preferenceKey: 'newReservation',
+      })
+      .catch(() => {});
 
     try {
       await emailQueue.add('reservation-confirmation', {
@@ -176,17 +196,6 @@ export class ReservationService {
         code: reservation.code,
       });
     } catch { /* queue may not be running in dev */ }
-
-    if (reservation.user.pushToken) {
-      try {
-        await pushQueue.add('reservation-push', {
-          pushToken: reservation.user.pushToken,
-          title: status === 'CONFIRMED' ? 'Reserva confirmada!' : 'Reserva pendiente',
-          body: `${reservation.restaurant.name} - ${input.date} a las ${input.time}`,
-          data: { reservationId: reservation.id },
-        });
-      } catch { /* queue may not be running in dev */ }
-    }
 
     if (restaurant.email) {
       try {
@@ -237,23 +246,38 @@ export class ReservationService {
       });
     });
 
-    await this.prisma.notification.create({
-      data: {
-        userId,
+    await this.notificationService
+      .notifyUser(userId, {
         title: 'Reserva cancelada',
         body: `Tu reserva en ${reservation.restaurant?.name ?? 'el restaurante'} ha sido cancelada.`,
         type: 'reservation',
         data: { reservationId },
-      },
-    }).catch(() => {});
+        preferenceKey: 'confirmations',
+      })
+      .catch(() => {});
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    await this.notificationService
+      .notifyRestaurant(reservation.restaurantId, {
+        title: 'Reserva cancelada',
+        body: `${user?.name ?? 'Cliente'} canceló su reserva del ${
+          reservation.date instanceof Date
+            ? reservation.date.toISOString().split('T')[0]
+            : reservation.date
+        } a las ${reservation.time}.`,
+        type: 'reservation_cancelled',
+        data: { reservationId, deepLink: '/(restaurant)/agenda' },
+        preferenceKey: 'cancellation',
+      })
+      .catch(() => {});
 
     const rest = await this.prisma.restaurant.findUnique({
       where: { id: reservation.restaurantId },
       select: { email: true, name: true },
-    });
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true },
     });
     if (rest?.email) {
       try {

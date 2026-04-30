@@ -25,6 +25,10 @@ export class AuthService {
       },
     });
 
+    await this.prisma.notificationPreference
+      .upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id } })
+      .catch(() => undefined);
+
     return this.generateTokens(user.id, 'user');
   }
 

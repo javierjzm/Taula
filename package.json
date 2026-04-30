@@ -7,6 +7,7 @@
     "dev:api": "turbo dev --filter=@taula/api",
     "dev:mobile": "turbo dev --filter=@taula/mobile",
     "dev:backoffice": "turbo dev --filter=@taula/backoffice",
+    "dev:admin": "turbo dev --filter=@taula/admin",
     "build": "turbo build",
     "test": "turbo test",
     "lint": "turbo lint",

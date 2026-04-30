@@ -23,22 +23,38 @@ const resolveApiUrl = (): string => {
 
 const API_URL = resolveApiUrl();
 
-const getToken = async (): Promise<string | null> => {
-  return storage.getItem('accessToken');
-};
+const USER_ACCESS = 'accessToken';
+const USER_REFRESH = 'refreshToken';
+const REST_ACCESS = 'restAccessToken';
+const REST_REFRESH = 'restRefreshToken';
+
+const getUserToken = async (): Promise<string | null> => storage.getItem(USER_ACCESS);
+const getRestaurantToken = async (): Promise<string | null> => storage.getItem(REST_ACCESS);
 
 const setTokens = async (accessToken: string, refreshToken: string) => {
-  await storage.setItem('accessToken', accessToken);
-  await storage.setItem('refreshToken', refreshToken);
+  await storage.setItem(USER_ACCESS, accessToken);
+  await storage.setItem(USER_REFRESH, refreshToken);
+};
+
+export const setRestaurantTokens = async (accessToken: string, refreshToken: string) => {
+  await storage.setItem(REST_ACCESS, accessToken);
+  await storage.setItem(REST_REFRESH, refreshToken);
 };
 
 export const clearTokens = async () => {
-  await storage.removeItem('accessToken');
-  await storage.removeItem('refreshToken');
+  await storage.removeItem(USER_ACCESS);
+  await storage.removeItem(USER_REFRESH);
+  await storage.removeItem(REST_ACCESS);
+  await storage.removeItem(REST_REFRESH);
+};
+
+export const clearRestaurantTokens = async () => {
+  await storage.removeItem(REST_ACCESS);
+  await storage.removeItem(REST_REFRESH);
 };
 
 const refreshAccessToken = async (): Promise<string | null> => {
-  const refreshToken = await storage.getItem('refreshToken');
+  const refreshToken = await storage.getItem(USER_REFRESH);
   if (!refreshToken) return null;
 
   try {
@@ -62,11 +78,14 @@ const refreshAccessToken = async (): Promise<string | null> => {
   }
 };
 
-export const api = async <T = any>(
+type RequestKind = 'user' | 'restaurant';
+
+async function request<T>(
   endpoint: string,
-  options: RequestInit = {},
-): Promise<T> => {
-  const token = await getToken();
+  options: RequestInit,
+  kind: RequestKind,
+): Promise<T> {
+  const token = kind === 'restaurant' ? await getRestaurantToken() : await getUserToken();
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -81,7 +100,7 @@ export const api = async <T = any>(
     throw new Error('No se pudo conectar con el servidor. Revisa API_URL y que la API esté levantada.');
   }
 
-  if (res.status === 401 && token) {
+  if (res.status === 401 && token && kind === 'user') {
     const newToken = await refreshAccessToken();
     if (newToken) {
       const retryHeaders: HeadersInit = {
@@ -98,10 +117,19 @@ export const api = async <T = any>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: 'Error de red' }));
-    throw new Error(error.message || `Error ${res.status}`);
+    throw Object.assign(new Error(error.message || `Error ${res.status}`), {
+      status: res.status,
+      code: error.code,
+    });
   }
 
   return res.json();
-};
+}
+
+export const api = <T = any>(endpoint: string, options: RequestInit = {}) =>
+  request<T>(endpoint, options, 'user');
+
+export const apiRestaurant = <T = any>(endpoint: string, options: RequestInit = {}) =>
+  request<T>(endpoint, options, 'restaurant');
 
 export { setTokens };

@@ -15,6 +15,7 @@ import { Colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -79,6 +80,8 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const logout = useAuthStore((s) => s.logout);
+  const ownerships = useAuthStore((s) => s.ownerships);
+  const hasRestaurant = ownerships.length > 0;
 
   const handleLogout = () => {
     Alert.alert(
@@ -163,6 +166,8 @@ export default function ProfileScreen() {
 
         <ProfileHeader />
 
+        <ModeSwitcher />
+
         <View style={styles.menu}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
@@ -184,18 +189,32 @@ export default function ProfileScreen() {
         </View>
 
         <TouchableOpacity
-          style={styles.restaurantCta}
-          onPress={() => router.push('/register-restaurant')}
+          style={[styles.restaurantCta, hasRestaurant && styles.restaurantCtaDisabled]}
+          onPress={() => {
+            if (hasRestaurant) return;
+            router.push('/register-restaurant');
+          }}
           activeOpacity={0.7}
+          disabled={hasRestaurant}
         >
           <View style={styles.restaurantCtaIcon}>
             <Ionicons name="storefront-outline" size={20} color={Colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.restaurantCtaTitle}>{t('register_restaurant.cta_profile')}</Text>
-            <Text style={styles.restaurantCtaSub}>{t('register_restaurant.subtitle')}</Text>
+            <Text style={styles.restaurantCtaTitle}>
+              {hasRestaurant ? 'Ya tienes un restaurante' : t('register_restaurant.cta_profile')}
+            </Text>
+            <Text style={styles.restaurantCtaSub}>
+              {hasRestaurant
+                ? 'Cada cuenta solo puede gestionar un restaurante.'
+                : t('register_restaurant.subtitle')}
+            </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+          <Ionicons
+            name={hasRestaurant ? 'checkmark-circle' : 'chevron-forward'}
+            size={18}
+            color={Colors.primary}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -334,6 +353,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.primary,
     gap: 12,
+  },
+  restaurantCtaDisabled: {
+    borderColor: Colors.border,
+    opacity: 0.75,
   },
   restaurantCtaIcon: {
     width: 42,

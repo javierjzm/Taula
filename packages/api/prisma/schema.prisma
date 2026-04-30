@@ -29,6 +29,8 @@ model User {
   reservations  Reservation[]
   reviews       Review[]
   notifications Notification[]
+  ownerships    RestaurantOwner[]
+  notifPreferences NotificationPreference?
 
   @@index([email])
   @@map("users")
@@ -64,10 +66,11 @@ model Restaurant {
   noShowFeePerPerson  Float     @default(10)
   noShowGraceMins     Int       @default(15)
   stripeAccountId     String?
+  externalReservationUrl String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  owner          RestaurantOwner?
+  owners         RestaurantOwner[]
   hours          OpeningHours[]
   reservations   Reservation[]
   reviews        Review[]
@@ -79,6 +82,8 @@ model Restaurant {
   menuCategories MenuCategory[]
   menuItems      MenuItem[]
   offers         Offer[]
+  notifications  Notification[]
+  subscription   Subscription?
 
   @@index([parish])
   @@index([isFeatured])
@@ -96,17 +101,27 @@ enum Parish {
   SANT_JULIA_DE_LORIA
 }
 
+// ─── OWNERS (join table User <-> Restaurant) ─────────────────────
 model RestaurantOwner {
   id           String     @id @default(cuid())
-  restaurantId String     @unique
-  email        String     @unique
-  name         String
-  passwordHash String
+  userId       String
+  restaurantId String
+  role         OwnerRole  @default(OWNER)
   createdAt    DateTime   @default(now())
 
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, restaurantId])
+  @@index([userId])
+  @@index([restaurantId])
   @@map("restaurant_owners")
+}
+
+enum OwnerRole {
+  OWNER
+  MANAGER
+  STAFF
 }
 
 model OpeningHours {
@@ -336,19 +351,80 @@ enum OfferType {
 
 // ─── NOTIFICACIONES IN-APP ────────────────────────────────────────
 model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String
-  body      String
-  type      String   @default("general")
-  data      Json?
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id           String     @id @default(cuid())
+  userId       String?
+  restaurantId String?
+  scope        NotifScope @default(USER)
+  title        String
+  body         String
+  type         String     @default("general")
+  data         Json?
+  read         Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  user       User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([restaurantId, read])
+  @@map("notifications")
+}
+
+enum NotifScope {
+  USER
+  RESTAURANT
+}
+
+model NotificationPreference {
+  userId         String  @id
+  confirmations  Boolean @default(true)
+  reminders      Boolean @default(true)
+  offers         Boolean @default(false)
+  newReservation Boolean @default(true)
+  cancellation   Boolean @default(true)
+  newReview      Boolean @default(true)
+  planAlerts     Boolean @default(true)
+  updatedAt      DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, read])
-  @@map("notifications")
+  @@map("notification_preferences")
+}
+
+// ─── PLANES Y SUSCRIPCIONES ──────────────────────────────────────
+enum PlanType {
+  RESERVATIONS
+  LISTING_BASIC
+  LISTING_FEATURED
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  ADMIN_GRANT
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  restaurantId         String             @unique
+  plan                 PlanType
+  status               SubscriptionStatus @default(INCOMPLETE)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  currentPeriodEnd     DateTime?
+  adminGranted         Boolean            @default(false)
+  adminGrantUntil      DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("subscriptions")
 }
 
 // ─── FACTURACIÓN ─────────────────────────────────────────────────

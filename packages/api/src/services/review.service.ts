@@ -1,8 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../utils/errors';
+import { NotificationService } from './notification.service';
 
 export class ReviewService {
-  constructor(private prisma: PrismaClient) {}
+  private notificationService: NotificationService;
+
+  constructor(private prisma: PrismaClient) {
+    this.notificationService = new NotificationService(prisma);
+  }
 
   async create(userId: string, input: {
     restaurantId: string;
@@ -21,7 +26,43 @@ export class ReviewService {
 
     await this.recalculateRating(input.restaurantId);
 
+    await this.notificationService
+      .notifyRestaurant(input.restaurantId, {
+        title: 'Nueva reseña',
+        body: `${review.user.name} dejó una reseña de ${input.rating} estrellas.`,
+        type: 'review_new',
+        data: { reviewId: review.id, deepLink: '/(restaurant)/reviews' },
+        preferenceKey: 'newReview',
+      })
+      .catch(() => {});
+
     return review;
+  }
+
+  async replyAndNotifyUser(reviewId: string, restaurantId: string, reply: string) {
+    const updated = await this.replyToReview(reviewId, restaurantId, reply);
+    if (updated) {
+      const full = await this.prisma.review.findUnique({
+        where: { id: reviewId },
+        include: { restaurant: { select: { name: true, slug: true } } },
+      });
+      if (full) {
+        await this.notificationService
+          .notifyUser(full.userId, {
+            title: `${full.restaurant.name} respondió a tu reseña`,
+            body: reply.slice(0, 140),
+            type: 'review_reply',
+            data: {
+              reviewId,
+              restaurantId,
+              slug: full.restaurant.slug,
+              deepLink: `/restaurant/${full.restaurant.slug}`,
+            },
+          })
+          .catch(() => {});
+      }
+    }
+    return updated;
   }
 
   async findByRestaurant(restaurantId: string, cursor?: string, limit = 10) {

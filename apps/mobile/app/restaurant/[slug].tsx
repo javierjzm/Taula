@@ -51,14 +51,19 @@ interface Restaurant {
   reviewCount: number;
   isOpen: boolean;
   hours: { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }[];
+  featured?: boolean;
+  plan?: 'RESERVATIONS' | 'LISTING_BASIC' | 'LISTING_FEATURED' | null;
+  isListingOnly?: boolean;
+  externalReservationUrl?: string | null;
 }
 
 interface Review {
   id: string;
-  userName: string;
-  userAvatar: string | null;
+  userName?: string | null;
+  userAvatar?: string | null;
+  user?: { name?: string | null; avatar?: string | null };
   rating: number;
-  comment: string;
+  comment: string | null;
   createdAt: string;
 }
 
@@ -120,18 +125,22 @@ function Stars({ rating }: { rating: number }) {
 /* ══════ REVIEW CARD ══════ */
 
 function ReviewCard({ review }: { review: Review }) {
+  const userName = review.userName ?? review.user?.name ?? 'Usuario';
+  const userAvatar = review.userAvatar ?? review.user?.avatar ?? null;
+  const userInitial = userName.trim().charAt(0).toUpperCase() || '?';
+
   return (
     <View style={s.reviewCard}>
       <View style={s.reviewTop}>
-        {review.userAvatar ? (
-          <Image source={{ uri: review.userAvatar }} style={s.reviewAvatar} />
+        {userAvatar ? (
+          <Image source={{ uri: userAvatar }} style={s.reviewAvatar} />
         ) : (
           <View style={[s.reviewAvatar, s.reviewAvatarFallback]}>
-            <Text style={s.reviewInitial}>{review.userName.charAt(0).toUpperCase()}</Text>
+            <Text style={s.reviewInitial}>{userInitial}</Text>
           </View>
         )}
         <View style={{ flex: 1 }}>
-          <Text style={s.reviewName}>{review.userName}</Text>
+          <Text style={s.reviewName}>{userName}</Text>
           <Text style={s.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
         </View>
         <Stars rating={review.rating} />
@@ -191,6 +200,11 @@ export default function RestaurantDetailScreen() {
         `/reservation/new?restaurantId=${restaurant.id}&slug=${slug}&name=${encodeURIComponent(restaurant.name)}`,
       );
     });
+  };
+
+  const handleExternalReserve = () => {
+    if (!restaurant?.externalReservationUrl) return;
+    Linking.openURL(restaurant.externalReservationUrl).catch(() => {});
   };
 
   const openMap = () => {
@@ -271,14 +285,22 @@ export default function RestaurantDetailScreen() {
 
           {/* Hero bottom info */}
           <View style={s.heroBottom}>
-            {restaurant.isOpen != null && (
-              <View style={[s.statusBadge, !restaurant.isOpen && s.statusClosed]}>
-                <View style={[s.statusDot, !restaurant.isOpen && s.statusDotClosed]} />
-                <Text style={[s.statusTxt, !restaurant.isOpen && s.statusTxtClosed]}>
-                  {restaurant.isOpen ? t('restaurant.open_now') : t('restaurant.closed')}
-                </Text>
-              </View>
-            )}
+            <View style={s.heroBadgesRow}>
+              {restaurant.featured && (
+                <View style={s.heroFeaturedBadge}>
+                  <Ionicons name="star" size={10} color={Colors.textInverse} />
+                  <Text style={s.heroFeaturedTxt}>Destacado</Text>
+                </View>
+              )}
+              {restaurant.isOpen != null && (
+                <View style={[s.statusBadge, !restaurant.isOpen && s.statusClosed]}>
+                  <View style={[s.statusDot, !restaurant.isOpen && s.statusDotClosed]} />
+                  <Text style={[s.statusTxt, !restaurant.isOpen && s.statusTxtClosed]}>
+                    {restaurant.isOpen ? t('restaurant.open_now') : t('restaurant.closed')}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={s.heroName} numberOfLines={2}>{restaurant.name}</Text>
             <View style={s.heroMeta}>
               <View style={s.heroRating}>
@@ -508,10 +530,32 @@ export default function RestaurantDetailScreen() {
             <Text style={s.bottomRatingTxt}>{restaurant.avgRating.toFixed(1)}</Text>
           </View>
         </View>
-        <TouchableOpacity style={s.reserveBtn} onPress={handleReserve} activeOpacity={0.85}>
-          <Text style={s.reserveTxt}>{t('restaurant.reserve')}</Text>
-          <Ionicons name="arrow-forward" size={18} color={Colors.textInverse} />
-        </TouchableOpacity>
+        {restaurant.isListingOnly ? (
+          restaurant.externalReservationUrl ? (
+            <TouchableOpacity style={s.reserveBtn} onPress={handleExternalReserve} activeOpacity={0.85}>
+              <Text style={s.reserveTxt}>Reservar en su web</Text>
+              <Ionicons name="open-outline" size={18} color={Colors.textInverse} />
+            </TouchableOpacity>
+          ) : restaurant.phone ? (
+            <TouchableOpacity
+              style={s.reserveBtn}
+              onPress={() => Linking.openURL(`tel:${restaurant.phone}`)}
+              activeOpacity={0.85}
+            >
+              <Text style={s.reserveTxt}>Llamar al restaurante</Text>
+              <Ionicons name="call" size={18} color={Colors.textInverse} />
+            </TouchableOpacity>
+          ) : (
+            <View style={[s.reserveBtn, { backgroundColor: Colors.surfaceSecondary }]}>
+              <Text style={[s.reserveTxt, { color: Colors.textTertiary }]}>Reservas no disponibles</Text>
+            </View>
+          )
+        ) : (
+          <TouchableOpacity style={s.reserveBtn} onPress={handleReserve} activeOpacity={0.85}>
+            <Text style={s.reserveTxt}>{t('restaurant.reserve')}</Text>
+            <Ionicons name="arrow-forward" size={18} color={Colors.textInverse} />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -534,7 +578,24 @@ const s = StyleSheet.create({
   heroNav: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
   heroCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
   heroBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 4 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(52,211,153,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 6, marginBottom: 8 },
+  heroBadgesRow: { flexDirection: 'row', gap: 8, marginBottom: 8, flexWrap: 'wrap' },
+  heroFeaturedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  heroFeaturedTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.textInverse,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(52,211,153,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 6 },
   statusClosed: { backgroundColor: 'rgba(248,113,113,0.15)' },
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success },
   statusDotClosed: { backgroundColor: Colors.error },

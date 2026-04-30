@@ -53,6 +53,10 @@ export const restaurantRoutes = async (fastify: FastifyInstance) => {
     const restaurant = await service.findBySlug(slug);
     if (!restaurant) return reply.code(404).send({ message: 'Restaurante no encontrado' });
 
+    if ((restaurant as any).isListingOnly) {
+      return { data: [], meta: { listingOnly: true, externalReservationUrl: restaurant.externalReservationUrl } };
+    }
+
     const { AvailabilityService } = await import('../services/availability.service');
     const availabilityService = new AvailabilityService(fastify.prisma);
     let slots = await availabilityService.getAvailableSlots(restaurant.id, date, partySize, zoneId);

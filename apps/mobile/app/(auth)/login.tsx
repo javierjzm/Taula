@@ -56,7 +56,8 @@ export default function LoginScreen() {
       const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken;
+      const signInResult = userInfo as { data?: { idToken?: string | null }; idToken?: string | null };
+      const idToken = signInResult.data?.idToken ?? signInResult.idToken;
       if (!idToken) return;
       setIsLoading(true);
       await loginWithGoogle(idToken);

@@ -2,10 +2,13 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { authenticateRestaurant } from '../middleware/restaurant-auth.middleware';
+import { requirePlan } from '../middleware/plan-gate.middleware';
 import { signAccessToken, signRefreshToken } from '../utils/jwt';
 import { AvailabilityService } from '../services/availability.service';
 import { ReviewService } from '../services/review.service';
 import { CloudinaryService } from '../services/cloudinary.service';
+import { NotificationService } from '../services/notification.service';
+import { AppError } from '../utils/errors';
 
 const PARISH_ENUM = z.enum([
   'ANDORRA_LA_VELLA', 'ESCALDES_ENGORDANY', 'ENCAMP', 'CANILLO',
@@ -16,29 +19,59 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
   const availabilityService = new AvailabilityService(fastify.prisma);
   const reviewService = new ReviewService(fastify.prisma);
   const cloudinaryService = new CloudinaryService();
+  const notificationService = new NotificationService(fastify.prisma);
+  const requireReservationsPlan = requirePlan({
+    prisma: fastify.prisma,
+    requireReservations: true,
+  });
 
   // ─── AUTH ────────────────────────────────────────────────────────
 
   fastify.post('/auth/login', async (request, reply) => {
-    const { email, password } = z
-      .object({ email: z.string().email(), password: z.string() })
+    const { email, password, restaurantId: requestedRestaurantId } = z
+      .object({
+        email: z.string().email(),
+        password: z.string(),
+        restaurantId: z.string().optional(),
+      })
       .parse(request.body);
 
-    const owner = await fastify.prisma.restaurantOwner.findUnique({ where: { email } });
-    if (!owner) return reply.code(401).send({ message: 'Credenciales incorrectas' });
+    const user = await fastify.prisma.user.findUnique({
+      where: { email },
+      include: {
+        ownerships: {
+          include: { restaurant: { select: { id: true, name: true, slug: true } } },
+        },
+      },
+    });
+    if (!user || !user.passwordHash) {
+      return reply.code(401).send({ message: 'Credenciales incorrectas' });
+    }
 
-    const valid = await bcrypt.compare(password, owner.passwordHash);
+    const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return reply.code(401).send({ message: 'Credenciales incorrectas' });
 
-    const restaurant = await fastify.prisma.restaurant.findUnique({
-      where: { id: owner.restaurantId },
-      select: { name: true },
-    });
+    if (user.ownerships.length === 0) {
+      return reply.code(403).send({ message: 'Esta cuenta no tiene restaurantes asociados' });
+    }
+
+    const ownership = requestedRestaurantId
+      ? user.ownerships.find((o) => o.restaurantId === requestedRestaurantId)
+      : user.ownerships[0];
+    if (!ownership) {
+      return reply.code(403).send({ message: 'No eres propietario de ese restaurante' });
+    }
 
     return {
-      accessToken: signAccessToken({ sub: owner.restaurantId, type: 'restaurant' }),
-      refreshToken: signRefreshToken({ sub: owner.restaurantId, type: 'restaurant' }),
-      restaurantName: restaurant?.name ?? '',
+      accessToken: signAccessToken({ sub: ownership.restaurantId, type: 'restaurant' }),
+      refreshToken: signRefreshToken({ sub: ownership.restaurantId, type: 'restaurant' }),
+      restaurantName: ownership.restaurant.name,
+      restaurants: user.ownerships.map((o) => ({
+        id: o.restaurant.id,
+        name: o.restaurant.name,
+        slug: o.restaurant.slug,
+        role: o.role,
+      })),
     };
   });
 
@@ -61,34 +94,87 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
 
     const slug = body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    const restaurant = await fastify.prisma.restaurant.create({
-      data: {
-        name: body.name,
-        slug,
-        description: body.description,
-        cuisineType: body.cuisineType,
-        priceRange: body.priceRange,
-        phone: body.phone,
-        email: body.email,
-        address: body.address,
-        parish: body.parish,
-        latitude: body.latitude,
-        longitude: body.longitude,
-        isActive: false,
-      },
+    const existingSlug = await fastify.prisma.restaurant.findUnique({ where: { slug } });
+    if (existingSlug) {
+      return reply.code(409).send({ message: 'Ya existe un restaurante con ese nombre' });
+    }
+
+    const result = await fastify.prisma.$transaction(async (tx) => {
+      let user = await tx.user.findUnique({ where: { email: body.ownerEmail } });
+      if (user) {
+        if (!user.passwordHash) {
+          throw new Error('Esta cuenta usa login con proveedor externo');
+        }
+        const valid = await bcrypt.compare(body.ownerPassword, user.passwordHash);
+        if (!valid) {
+          throw new Error('La contraseña no coincide con la cuenta existente');
+        }
+      } else {
+        user = await tx.user.create({
+          data: {
+            email: body.ownerEmail,
+            name: body.ownerName,
+            passwordHash: await bcrypt.hash(body.ownerPassword, 12),
+            authProvider: 'email',
+            preferredLang: 'ca',
+          },
+        });
+      }
+
+      const existingOwnership = await tx.restaurantOwner.findFirst({
+        where: { userId: user.id },
+        select: { restaurant: { select: { name: true } } },
+      });
+      if (existingOwnership) {
+        throw new AppError(
+          409,
+          `Esta cuenta ya gestiona ${existingOwnership.restaurant.name}. Cada cuenta solo puede tener un restaurante.`,
+          'RESTAURANT_OWNER_LIMIT',
+        );
+      }
+
+      const restaurant = await tx.restaurant.create({
+        data: {
+          name: body.name,
+          slug,
+          description: body.description,
+          cuisineType: body.cuisineType,
+          priceRange: body.priceRange,
+          phone: body.phone,
+          email: body.email,
+          address: body.address,
+          parish: body.parish,
+          latitude: body.latitude,
+          longitude: body.longitude,
+          isActive: false,
+        },
+      });
+
+      await tx.restaurantOwner.create({
+        data: { userId: user.id, restaurantId: restaurant.id, role: 'OWNER' },
+      });
+
+      await tx.subscription.create({
+        data: {
+          restaurantId: restaurant.id,
+          plan: 'RESERVATIONS',
+          status: 'INCOMPLETE',
+        },
+      });
+
+      await tx.notificationPreference.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: { userId: user.id },
+      });
+
+      return restaurant;
     });
 
-    const passwordHash = await bcrypt.hash(body.ownerPassword, 12);
-    await fastify.prisma.restaurantOwner.create({
-      data: {
-        restaurantId: restaurant.id,
-        email: body.ownerEmail,
-        name: body.ownerName,
-        passwordHash,
-      },
+    return reply.code(201).send({
+      data: result,
+      message: 'Restaurante registrado. Pendiente de aprobacion.',
     });
-
-    return reply.code(201).send({ data: restaurant, message: 'Restaurante registrado. Pendiente de aprobacion.' });
   });
 
   // ─── PROFILE ─────────────────────────────────────────────────────
@@ -96,7 +182,13 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/me', { preHandler: [authenticateRestaurant] }, async (request) => {
     const restaurant = await fastify.prisma.restaurant.findUnique({
       where: { id: request.restaurantId },
-      include: { hours: true, owner: true, zones: { include: { tables: true } }, services: true },
+      include: {
+        hours: true,
+        owners: { include: { user: { select: { id: true, name: true, email: true } } } },
+        zones: { include: { tables: true } },
+        services: true,
+        subscription: true,
+      },
     });
     return { data: restaurant };
   });
@@ -111,6 +203,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
       priceRange: z.number().int().min(1).max(4).optional(),
       coverImage: z.string().url().nullable().optional(),
       images: z.array(z.string().url()).optional(),
+      externalReservationUrl: z.string().url().nullable().optional(),
     }).parse(request.body);
 
     const restaurant = await fastify.prisma.restaurant.update({
@@ -164,7 +257,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
 
   // ─── ZONES CRUD ──────────────────────────────────────────────────
 
-  fastify.get('/zones', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.get('/zones', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const zones = await fastify.prisma.zone.findMany({
       where: { restaurantId: request.restaurantId },
       include: { tables: { orderBy: { label: 'asc' } } },
@@ -173,7 +266,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: zones };
   });
 
-  fastify.post('/zones', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.post('/zones', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const body = z.object({
       name: z.string().min(1),
       sortOrder: z.number().int().default(0),
@@ -185,7 +278,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: zone };
   });
 
-  fastify.put('/zones/:id', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.put('/zones/:id', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     const body = z.object({
       name: z.string().min(1).optional(),
@@ -202,7 +295,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: updated };
   });
 
-  fastify.delete('/zones/:id', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.delete('/zones/:id', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     await fastify.prisma.zone.deleteMany({
       where: { id, restaurantId: request.restaurantId },
@@ -212,7 +305,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
 
   // ─── TABLES CRUD ─────────────────────────────────────────────────
 
-  fastify.get('/tables', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.get('/tables', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { zoneId } = z.object({ zoneId: z.string().optional() }).parse(request.query);
     const where: any = { restaurantId: request.restaurantId };
     if (zoneId) where.zoneId = zoneId;
@@ -225,7 +318,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: tables };
   });
 
-  fastify.post('/tables', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.post('/tables', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const body = z.object({
       zoneId: z.string(),
       label: z.string().min(1),
@@ -244,7 +337,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: table };
   });
 
-  fastify.put('/tables/:id', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.put('/tables/:id', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     const body = z.object({
       label: z.string().min(1).optional(),
@@ -264,7 +357,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: updated };
   });
 
-  fastify.delete('/tables/:id', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.delete('/tables/:id', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     await fastify.prisma.restaurantTable.deleteMany({
       where: { id, restaurantId: request.restaurantId },
@@ -274,7 +367,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
 
   // ─── SERVICES CRUD ───────────────────────────────────────────────
 
-  fastify.get('/services', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.get('/services', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const services = await fastify.prisma.service.findMany({
       where: { restaurantId: request.restaurantId },
       orderBy: { startTime: 'asc' },
@@ -282,7 +375,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: services };
   });
 
-  fastify.post('/services', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.post('/services', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const body = z.object({
       name: z.string().min(1),
       startTime: z.string().regex(/^\d{2}:\d{2}$/),
@@ -299,7 +392,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: service };
   });
 
-  fastify.put('/services/:id', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.put('/services/:id', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     const body = z.object({
       name: z.string().min(1).optional(),
@@ -321,7 +414,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: updated };
   });
 
-  fastify.delete('/services/:id', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.delete('/services/:id', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     await fastify.prisma.service.deleteMany({
       where: { id, restaurantId: request.restaurantId },
@@ -331,7 +424,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
 
   // ─── BLOCKED DATES CRUD ──────────────────────────────────────────
 
-  fastify.get('/blocked-dates', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.get('/blocked-dates', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const dates = await fastify.prisma.blockedDate.findMany({
       where: { restaurantId: request.restaurantId },
       include: { service: { select: { name: true } } },
@@ -340,7 +433,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: dates };
   });
 
-  fastify.post('/blocked-dates', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.post('/blocked-dates', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const body = z.object({
       date: z.string(),
       reason: z.string().optional(),
@@ -360,7 +453,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: blocked };
   });
 
-  fastify.delete('/blocked-dates/:id', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.delete('/blocked-dates/:id', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     await fastify.prisma.blockedDate.deleteMany({
       where: { id, restaurantId: request.restaurantId },
@@ -370,7 +463,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
 
   // ─── RESERVATIONS ────────────────────────────────────────────────
 
-  fastify.get('/reservations', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.get('/reservations', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { date, status } = z.object({
       date: z.string().optional(),
       status: z.string().optional(),
@@ -391,7 +484,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
     return { data: reservations };
   });
 
-  fastify.patch('/reservations/:id', { preHandler: [authenticateRestaurant] }, async (request, reply) => {
+  fastify.patch('/reservations/:id', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request, reply) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     const { status } = z.object({
       status: z.enum(['CONFIRMED', 'ARRIVED', 'NO_SHOW', 'CANCELLED_RESTAURANT']),
@@ -420,17 +513,44 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
       where: { id },
       data: { status },
       include: {
-        user: { select: { name: true, email: true, phone: true } },
+        user: { select: { id: true, name: true, email: true, phone: true } },
+        restaurant: { select: { name: true } },
         tableAssignment: { include: { table: { include: { zone: true } } } },
       },
     });
+
+    if (status === 'CONFIRMED' && current.status === 'PENDING') {
+      await notificationService
+        .notifyUser(reservation.userId, {
+          title: 'Reserva confirmada',
+          body: `${reservation.restaurant.name} confirmó tu reserva del ${reservation.date
+            .toISOString()
+            .split('T')[0]} a las ${reservation.time}.`,
+          type: 'reservation_confirmed',
+          data: { reservationId: id, deepLink: `/reservation/${id}` },
+          preferenceKey: 'confirmations',
+        })
+        .catch(() => {});
+    } else if (status === 'CANCELLED_RESTAURANT') {
+      await notificationService
+        .notifyUser(reservation.userId, {
+          title: 'Reserva cancelada por el restaurante',
+          body: `${reservation.restaurant.name} canceló tu reserva del ${reservation.date
+            .toISOString()
+            .split('T')[0]} a las ${reservation.time}.`,
+          type: 'reservation_cancelled_restaurant',
+          data: { reservationId: id, deepLink: `/reservation/${id}` },
+          preferenceKey: 'confirmations',
+        })
+        .catch(() => {});
+    }
 
     return { data: reservation };
   });
 
   // ─── TIMELINE (GANTT VIEW) ───────────────────────────────────────
 
-  fastify.get('/timeline', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.get('/timeline', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { date } = z.object({ date: z.string() }).parse(request.query);
     const entries = await availabilityService.getTimeline(request.restaurantId, date);
 
@@ -450,7 +570,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
 
   // ─── CALENDAR ────────────────────────────────────────────────────
 
-  fastify.get('/calendar', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.get('/calendar', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { year, month } = z.object({
       year: z.coerce.number().int(),
       month: z.coerce.number().int().min(1).max(12),
@@ -464,7 +584,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
 
   // ─── STATS ───────────────────────────────────────────────────────
 
-  fastify.get('/stats', { preHandler: [authenticateRestaurant] }, async (request) => {
+  fastify.get('/stats', { preHandler: [authenticateRestaurant, requireReservationsPlan] }, async (request) => {
     const { from, to } = z.object({ from: z.string().optional(), to: z.string().optional() }).parse(request.query);
 
     const where: any = { restaurantId: request.restaurantId };
@@ -532,7 +652,7 @@ export const restaurantPanelRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/reviews/:id/reply', { preHandler: [authenticateRestaurant] }, async (request) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     const { reply: replyText } = z.object({ reply: z.string().max(500) }).parse(request.body);
-    const review = await reviewService.replyToReview(id, request.restaurantId, replyText);
+    const review = await reviewService.replyAndNotifyUser(id, request.restaurantId, replyText);
     return { data: review };
   });
 

@@ -24,6 +24,9 @@ const mockPrisma: any = {
     create: vi.fn(),
     update: vi.fn(),
   },
+  notificationPreference: {
+    upsert: vi.fn(),
+  },
 };
 
 describe('AuthService', () => {
@@ -38,6 +41,7 @@ describe('AuthService', () => {
     it('should create a new user and return tokens', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue(mockUser);
+      mockPrisma.notificationPreference.upsert.mockResolvedValue({ userId: mockUser.id });
 
       const result = await service.register({
         email: 'new@taula.ad',

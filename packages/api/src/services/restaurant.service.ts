@@ -41,6 +41,9 @@ export class RestaurantService {
       include: {
         hours: true,
         offers: { where: { isActive: true }, select: { id: true, title: true, type: true, value: true, endDate: true, daysOfWeek: true } },
+        subscription: {
+          select: { plan: true, status: true, adminGrantUntil: true },
+        },
       },
       orderBy: [
         { isFeatured: 'desc' },
@@ -54,75 +57,102 @@ export class RestaurantService {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dayOfWeek = now.getDay();
 
-    return restaurants
-      .map((r) => {
-        const distanceMeters =
-          filters.lat && filters.lon
-            ? this.calculateDistance(filters.lat, filters.lon, r.latitude, r.longitude)
-            : null;
+    const decorated = restaurants.map((r) => {
+      const distanceMeters =
+        filters.lat && filters.lon
+          ? this.calculateDistance(filters.lat, filters.lon, r.latitude, r.longitude)
+          : null;
 
-        return {
-          id: r.id,
-          name: r.name,
-          slug: r.slug,
-          description: r.description,
-          cuisineType: r.cuisineType,
-          cuisine: r.cuisineType.join(', '),
-          priceRange: r.priceRange,
-          phone: r.phone,
-          email: r.email,
-          website: r.website,
-          address: r.address,
-          parish: r.parish.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase()),
-          latitude: r.latitude,
-          longitude: r.longitude,
-          isActive: r.isActive,
-          isFeatured: r.isFeatured,
-          coverImage: r.coverImage,
-          images: r.images,
-          avgRating: r.avgRating,
-          reviewCount: r.reviewCount,
-          distanceMeters,
-          distance: distanceMeters != null ? Math.round((distanceMeters / 1000) * 10) / 10 : null,
-          isOpen: this.checkIsOpen(r.hours, now),
-          activeOffer: (() => {
-            const valid = (r as any).offers?.filter((o: any) => {
-              if (o.endDate && o.endDate < today) return false;
-              if (o.daysOfWeek?.length > 0 && !o.daysOfWeek.includes(dayOfWeek)) return false;
-              return true;
-            }) ?? [];
-            if (valid.length === 0) return null;
-            const best = valid[0];
-            return { id: best.id, title: best.title, type: best.type, value: best.value };
-          })(),
-        };
-      })
-      .filter((r) => {
-        if (r.distanceMeters == null) return true;
-        const radiusMeters = filters.radius ?? 50000;
-        return r.distanceMeters <= radiusMeters;
-      })
-      .sort((a, b) => {
-        if (a.distanceMeters != null && b.distanceMeters != null) {
-          return a.distanceMeters - b.distanceMeters;
-        }
-        return 0;
-      });
+      const sub = (r as any).subscription as
+        | { plan: 'RESERVATIONS' | 'LISTING_BASIC' | 'LISTING_FEATURED'; status: string; adminGrantUntil: Date | null }
+        | null;
+      const planActive = !!sub && isPlanActive(sub.status, sub.adminGrantUntil);
+      const featured = !!sub && sub.plan === 'LISTING_FEATURED' && planActive;
+
+      return {
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        description: r.description,
+        cuisineType: r.cuisineType,
+        cuisine: r.cuisineType.join(', '),
+        priceRange: r.priceRange,
+        phone: r.phone,
+        email: r.email,
+        website: r.website,
+        address: r.address,
+        parish: r.parish.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase()),
+        latitude: r.latitude,
+        longitude: r.longitude,
+        isActive: r.isActive,
+        isFeatured: r.isFeatured || featured,
+        featured,
+        plan: sub?.plan ?? null,
+        externalReservationUrl: r.externalReservationUrl ?? null,
+        coverImage: r.coverImage,
+        images: r.images,
+        avgRating: r.avgRating,
+        reviewCount: r.reviewCount,
+        distanceMeters,
+        distance: distanceMeters != null ? Math.round((distanceMeters / 1000) * 10) / 10 : null,
+        isOpen: this.checkIsOpen(r.hours, now),
+        activeOffer: (() => {
+          const valid = (r as any).offers?.filter((o: any) => {
+            if (o.endDate && o.endDate < today) return false;
+            if (o.daysOfWeek?.length > 0 && !o.daysOfWeek.includes(dayOfWeek)) return false;
+            return true;
+          }) ?? [];
+          if (valid.length === 0) return null;
+          const best = valid[0];
+          return { id: best.id, title: best.title, type: best.type, value: best.value };
+        })(),
+      };
+    });
+
+    const filtered = decorated.filter((r) => {
+      if (r.distanceMeters == null) return true;
+      const radiusMeters = filters.radius ?? 50000;
+      return r.distanceMeters <= radiusMeters;
+    });
+
+    return filtered.sort((a, b) => {
+      if (a.featured !== b.featured) return a.featured ? -1 : 1;
+      if (a.distanceMeters != null && b.distanceMeters != null) {
+        return a.distanceMeters - b.distanceMeters;
+      }
+      return b.avgRating - a.avgRating;
+    });
   }
 
   async findBySlug(slug: string) {
     const restaurant = await this.prisma.restaurant.findFirst({
       where: { slug, isActive: true },
-      include: { hours: true },
+      include: {
+        hours: true,
+        subscription: {
+          select: { plan: true, status: true, adminGrantUntil: true },
+        },
+      },
     });
     if (!restaurant) return null;
 
     const now = new Date();
+    const sub = (restaurant as any).subscription as
+      | { plan: 'RESERVATIONS' | 'LISTING_BASIC' | 'LISTING_FEATURED'; status: string; adminGrantUntil: Date | null }
+      | null;
+    const planActive = !!sub && isPlanActive(sub.status, sub.adminGrantUntil);
+    const featured = !!sub && sub.plan === 'LISTING_FEATURED' && planActive;
+    const isListingOnly = !!sub && (sub.plan === 'LISTING_BASIC' || sub.plan === 'LISTING_FEATURED') && planActive;
+
     return {
       ...restaurant,
       parish: restaurant.parish.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase()),
       cuisine: restaurant.cuisineType.join(', '),
       isOpen: this.checkIsOpen(restaurant.hours, now),
+      plan: sub?.plan ?? null,
+      featured,
+      isListingOnly,
+      externalReservationUrl: restaurant.externalReservationUrl ?? null,
     };
   }
 
@@ -157,4 +187,13 @@ export class RestaurantService {
         Math.sin(dLon / 2);
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
+}
+
+function isPlanActive(status: string, adminGrantUntil: Date | null): boolean {
+  if (status === 'ACTIVE' || status === 'TRIALING') return true;
+  if (status === 'ADMIN_GRANT') {
+    if (!adminGrantUntil) return true;
+    return adminGrantUntil.getTime() > Date.now();
+  }
+  return false;
 }

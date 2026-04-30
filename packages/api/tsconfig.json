@@ -2,10 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "../..",
     "paths": {
       "@taula/shared": ["../shared/src"]
     }
   },
-  "include": ["src/**/*", "prisma/**/*"]
+  "include": ["src/**/*", "../shared/src/**/*"]
 }

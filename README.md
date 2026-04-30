@@ -1,6 +1,16 @@
 # Taula - Plataforma de Reservas de Restaurantes para Andorra
 
-Monorepo con 3 aplicaciones: API backend, app movil (React Native/Expo) y backoffice web (React/Vite).
+Monorepo con 4 aplicaciones: API backend, app movil (React Native/Expo, doble perfil cliente/restaurante), admin web (React/Vite) y backoffice web legacy en proceso de retirada.
+
+## Novedades importantes
+
+- **App movil unificada cliente + restaurante**: una sola cuenta `User` puede tener varios restaurantes vinculados y alternar entre modo cliente y modo restaurante con un selector. El antiguo backoffice web queda **deprecado** (banner visible en sus pantallas).
+- **Planes de pago**:
+  - **Plan A "Taula Reservations"**: 20 EUR/mes via Stripe Subscription + 1 EUR por comensal (`BillingRecord`). Incluye el sistema de reservas Taula completo.
+  - **Plan B Basic "Listing"**: 49,99 EUR/mes. Solo aparece en el listado, con `externalReservationUrl` para reservar en su web.
+  - **Plan B Featured "Listing"**: 99,99 EUR/mes. Igual que Basic + badge "Destacado", seccion destacada en home y posicion top en filtros.
+- **Concesion gratuita por admin**: nueva web `apps/admin/` (puerto 5180) para asignar planes manualmente (`ADMIN_GRANT`, opcionalmente con fecha de caducidad).
+- **Notificaciones**: bandeja unica en la app (`/notifications`) con scope cliente o restaurante segun modo. Preferencias persistidas en backend (`NotificationPreference`). Disparadores: nueva reserva, cancelacion, recordatorio 24 h y 2 h, recordatorio de resena, nueva resena, fallo de cobro de plan y fallo no-show.
 
 ---
 
@@ -22,16 +32,17 @@ Monorepo con 3 aplicaciones: API backend, app movil (React Native/Expo) y backof
 ```
 taula/
 ├── apps/
-│   ├── mobile/            # React Native + Expo (iOS/Android)
-│   └── backoffice/        # React + Vite + TailwindCSS (panel restaurante)
+│   ├── mobile/            # React Native + Expo (iOS/Android, modos cliente y restaurante)
+│   ├── admin/             # React + Vite + TailwindCSS (panel admin interno: planes, usuarios, stats)
+│   └── backoffice/        # React + Vite + TailwindCSS (panel restaurante - DEPRECADO, banner activo)
 ├── packages/
-│   ├── api/               # Fastify + Prisma + PostgreSQL + Redis
+│   ├── api/               # Fastify + Prisma + PostgreSQL + Redis + Stripe Subscriptions
 │   └── shared/            # Tipos TypeScript + Schemas Zod compartidos
 ├── .github/workflows/     # CI/CD (GitHub Actions)
 ├── docker-compose.yml     # PostgreSQL + Redis para desarrollo
 ├── turbo.json             # Configuracion Turborepo
 ├── pnpm-workspace.yaml    # Workspaces monorepo
-└── .env.example           # Variables de entorno plantilla
+└── .env.example           # Variables de entorno plantilla (incluye STRIPE_PRICE_*)
 ```
 
 ---
@@ -109,13 +120,27 @@ curl http://localhost:3000/health
 # {"status":"ok","timestamp":"..."}
 ```
 
-### 2.2 Solo el backoffice web
+### 2.2 Solo el backoffice web (legacy / deprecado)
 
 ```bash
 pnpm dev:backoffice
 ```
 
-Abre **http://localhost:5173**. El proxy de Vite redirige `/v1/*` a la API en el puerto 3000, asi que la API debe estar corriendo.
+Abre **http://localhost:5173**. Esta web muestra ya un banner indicando que la nueva experiencia esta en la app movil. Se mantiene temporalmente como ayuda; sera eliminada cuando la app movil tenga paridad total.
+
+### 2.2 bis Admin web (interno)
+
+```bash
+pnpm dev:admin
+```
+
+Abre **http://localhost:5180**. Pide la `ADMIN_API_KEY` definida en `.env`. Permite:
+
+- Listar restaurantes con su plan y estado de suscripcion.
+- Detalle de cada restaurante con sus owners, reservas y resenas.
+- **Conceder un plan gratuitamente** (`ADMIN_GRANT`) con fecha opcional de caducidad y revocarlo.
+- Aprobar restaurantes pendientes.
+- Ver usuarios y estadisticas globales.
 
 ### 2.3 Solo la app movil (Expo)
 
@@ -237,9 +262,27 @@ Base URL: `http://localhost:3000/v1`
 | `GET` | `/restaurant/slots` | Mis slots | Si (restaurant) |
 | `POST` | `/restaurant/slots/block` | Bloquear slot | Si (restaurant) |
 | `GET` | `/restaurant/stats` | Estadisticas | Si (restaurant) |
+| `GET` | `/restaurant/billing/subscription` | Estado de suscripcion + uso del mes | Si (restaurant) |
+| `POST` | `/restaurant/billing/checkout` | Crear sesion Stripe Checkout (planes) | Si (restaurant) |
+| `POST` | `/restaurant/billing/portal` | Abrir Stripe Customer Portal | Si (restaurant) |
+| `POST` | `/restaurant/billing/cancel` | Cancelar al final del periodo | Si (restaurant) |
+| `POST` | `/webhooks/stripe` | Webhook de Stripe (sync suscripciones) | Firma Stripe |
+| `GET` | `/notifications` | Bandeja del usuario actual | Si (user) |
+| `PATCH` | `/notifications/:id/read` | Marcar como leida | Si (user) |
+| `POST` | `/notifications/read-all` | Marcar todas como leidas | Si (user) |
+| `GET` | `/notifications/preferences` | Preferencias de notificacion | Si (user) |
+| `PATCH` | `/notifications/preferences` | Actualizar preferencias | Si (user) |
+| `GET` | `/notifications/restaurant` | Bandeja del restaurante activo | Si (restaurant) |
+| `GET` | `/me/ownerships` | Restaurantes que posee el usuario | Si (user) |
+| `POST` | `/me/restaurant-token` | Obtener token de modo restaurante | Si (user) |
+| `GET` | `/admin/restaurants` | Listar restaurantes (con filtros) | Si (admin key) |
+| `GET` | `/admin/restaurants/:id` | Detalle de restaurante (con suscripcion) | Si (admin key) |
 | `GET` | `/admin/restaurants/pending` | Restaurantes pendientes | Si (admin key) |
 | `PATCH` | `/admin/restaurants/:id/approve` | Aprobar restaurante | Si (admin key) |
-| `GET` | `/admin/stats` | Stats globales | Si (admin key) |
+| `POST` | `/admin/restaurants/:id/grant-plan` | Conceder un plan gratuito | Si (admin key) |
+| `POST` | `/admin/restaurants/:id/revoke-plan` | Revocar plan otorgado por admin | Si (admin key) |
+| `GET` | `/admin/users` | Listado de usuarios | Si (admin key) |
+| `GET` | `/admin/stats` | Stats globales (incluye planes) | Si (admin key) |
 
 **Autenticacion:** Enviar `Authorization: Bearer <accessToken>` en las cabeceras. Para admin: `x-admin-key: <ADMIN_API_KEY>`.
 
@@ -251,7 +294,8 @@ Base URL: `http://localhost:3000/v1`
 # ─── Desarrollo ──────────────────────────────────────
 pnpm dev                  # Arranca todo (API + backoffice + mobile)
 pnpm dev:api              # Solo API (puerto 3000)
-pnpm dev:backoffice       # Solo backoffice (puerto 5173)
+pnpm dev:backoffice       # Solo backoffice (puerto 5173, legacy)
+pnpm dev:admin            # Solo admin web (puerto 5180)
 pnpm dev:mobile           # Solo Expo (app movil)
 
 # ─── Base de datos ───────────────────────────────────
@@ -320,7 +364,9 @@ User ─────────── Reservation ────── Restaurant
 - **Zone / RestaurantTable / Service**: configuracion del panel (mesas, turnos, duracion); la disponibilidad se calcula en servidor (`availability.service.ts`)
 - **Reservation**: codigo unico (`TAU-XXXX`), estados `PENDING` / `CONFIRMED`, asignacion de mesa cuando aplica
 - **Review**: resenas 1-5 estrellas (una por usuario/restaurante)
-- **BillingRecord**: facturacion por reserva (1.80 EUR/comensal)
+- **BillingRecord**: facturacion por reserva del Plan A (1 EUR/comensal). Solo se genera cuando el restaurante tiene plan activo `RESERVATIONS`.
+- **Subscription**: plan activo del restaurante (`RESERVATIONS`, `LISTING_BASIC`, `LISTING_FEATURED`) con estado Stripe sincronizado por webhook (`/v1/webhooks/stripe`) o concedido manualmente por admin (`status = ADMIN_GRANT`).
+- **NotificationPreference / Notification**: preferencias por usuario y bandeja unificada con scope `USER` o `RESTAURANT` (multi-restaurante por owner).
 
 ---
 

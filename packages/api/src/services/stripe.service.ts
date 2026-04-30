@@ -5,10 +5,12 @@ const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null;
 
+type StripeClient = InstanceType<typeof Stripe>;
+
 export class StripeService {
   constructor(private prisma: PrismaClient) {}
 
-  private ensureStripe(): Stripe {
+  private ensureStripe(): StripeClient {
     if (!stripe) throw new Error('Stripe not configured');
     return stripe;
   }
@@ -60,7 +62,7 @@ export class StripeService {
   /**
    * List saved payment methods for a user.
    */
-  async listPaymentMethods(userId: string): Promise<Stripe.PaymentMethod[]> {
+  async listPaymentMethods(userId: string): Promise<Awaited<ReturnType<StripeClient['paymentMethods']['list']>>['data']> {
     const s = this.ensureStripe();
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user?.stripeCustomerId) return [];

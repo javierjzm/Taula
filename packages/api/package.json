@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "env-cmd -f ../../.env -- tsx watch src/app.ts",
     "build": "tsc",
-    "start": "node dist/app.js",
+    "start": "node dist/packages/api/src/app.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",

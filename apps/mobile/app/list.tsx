@@ -26,6 +26,9 @@ interface Restaurant {
   parish: string;
   distance?: number;
   isOpen?: boolean;
+  featured?: boolean;
+  plan?: 'RESERVATIONS' | 'LISTING_BASIC' | 'LISTING_FEATURED' | null;
+  externalReservationUrl?: string | null;
 }
 
 // cuisineLabel resolved inside RestaurantRow with getCuisineLabel(id, t)
@@ -48,6 +51,12 @@ function RestaurantRow({ item }: { item: Restaurant }) {
         ) : (
           <View style={[s.img, s.imgPlaceholder]}>
             <Ionicons name="restaurant-outline" size={28} color={Colors.textTertiary} />
+          </View>
+        )}
+        {item.featured && (
+          <View style={s.featuredBadge}>
+            <Ionicons name="star" size={10} color={Colors.textInverse} />
+            <Text style={s.featuredBadgeTxt}>Destacado</Text>
           </View>
         )}
         {item.isOpen != null && (
@@ -87,21 +96,24 @@ function RestaurantRow({ item }: { item: Restaurant }) {
 }
 
 export default function ListScreen() {
-  const { sort } = useLocalSearchParams<{ sort: string }>();
+  const { sort, featured } = useLocalSearchParams<{ sort?: string; featured?: string }>();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { location } = useLocation();
 
+  const onlyFeatured = featured === '1' || featured === 'true';
   const mode: SortMode = sort === 'top_rated' ? 'top_rated' : 'nearby';
-  const title = t(mode === 'nearby' ? 'list.nearby' : 'list.top_rated');
+  const title = onlyFeatured
+    ? 'Destacados'
+    : t(mode === 'nearby' ? 'list.nearby' : 'list.top_rated');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['list', mode, location.latitude, location.longitude],
+    queryKey: ['list', mode, onlyFeatured, location.latitude, location.longitude],
     queryFn: () => {
       const params = new URLSearchParams({
         lat: String(location.latitude),
         lon: String(location.longitude),
-        limit: '20',
+        limit: '40',
       });
       if (mode === 'top_rated') params.set('sort', 'rating');
       return api<{ data: Restaurant[] }>(`/restaurants?${params.toString()}`);
@@ -109,10 +121,17 @@ export default function ListScreen() {
   });
 
   const rawList = data?.data ?? [];
+  const filtered = onlyFeatured ? rawList.filter((r) => r.featured) : rawList;
 
-  const sorted = mode === 'nearby'
-    ? [...rawList].sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999))
-    : [...rawList].sort((a, b) => b.avgRating - a.avgRating || b.reviewCount - a.reviewCount);
+  const sorted = (() => {
+    const base =
+      mode === 'nearby'
+        ? [...filtered].sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999))
+        : [...filtered].sort(
+            (a, b) => b.avgRating - a.avgRating || b.reviewCount - a.reviewCount,
+          );
+    return base.sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+  })();
 
   return (
     <View style={s.root}>
@@ -193,6 +212,19 @@ const s = StyleSheet.create({
   statusClosed: { backgroundColor: 'rgba(248,113,113,0.2)' },
   statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success },
   statusDotClosed: { backgroundColor: Colors.error },
+  featuredBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  featuredBadgeTxt: { fontSize: 9, fontWeight: '800', color: Colors.textInverse, textTransform: 'uppercase' },
 
   body: { flex: 1, padding: 12, gap: 4, justifyContent: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },

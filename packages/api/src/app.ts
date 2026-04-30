@@ -11,6 +11,8 @@ import { meRoutes } from './routes/me';
 import { restaurantPanelRoutes } from './routes/restaurant-panel';
 import { adminRoutes } from './routes/admin';
 import { notificationRoutes } from './routes/notifications';
+import { billingRoutes } from './routes/billing';
+import { webhookRoutes } from './routes/webhooks';
 import { AppError } from './utils/errors';
 import { NoShowCronService } from './services/noshow-cron.service';
 import { startReminderCron } from './jobs/reminders';
@@ -36,25 +38,33 @@ app.register(reservationRoutes, { prefix: '/v1/reservations' });
 app.register(reviewRoutes, { prefix: '/v1/reviews' });
 app.register(meRoutes, { prefix: '/v1/me' });
 app.register(restaurantPanelRoutes, { prefix: '/v1/restaurant' });
+app.register(billingRoutes, { prefix: '/v1/restaurant/billing' });
 app.register(adminRoutes, { prefix: '/v1/admin' });
 app.register(notificationRoutes, { prefix: '/v1/notifications' });
+
+// Webhooks: encapsulado para tener su propio body parser (raw buffer).
+app.register(async (instance) => {
+  await instance.register(webhookRoutes);
+}, { prefix: '/v1/webhooks' });
 
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.setErrorHandler((error, _request, reply) => {
-  if (error instanceof AppError) {
-    return reply.code(error.statusCode).send({
-      statusCode: error.statusCode,
-      error: error.name,
-      message: error.message,
+  const err = error as Error & { validation?: unknown; statusCode?: number };
+
+  if (err instanceof AppError) {
+    return reply.code(err.statusCode).send({
+      statusCode: err.statusCode,
+      error: err.name,
+      message: err.message,
     });
   }
 
-  if (error.validation) {
+  if (err.validation) {
     return reply.code(422).send({
       statusCode: 422,
       error: 'Validation Error',
-      message: error.message,
+      message: err.message,
     });
   }
 
